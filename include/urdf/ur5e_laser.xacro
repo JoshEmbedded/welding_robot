@@ -8,10 +8,10 @@
     <xacro:include filename="$(find alpaka_demo)/include/urdf/line_scanner.xacro"/>
 
     <!-- Declare necessary arguments -->
-    <xacro:arg name="joint_limit_params" default=""/>
-    <xacro:arg name="physical_params" default=""/>
-    <xacro:arg name="kinematics_params" default=""/>
-    <xacro:arg name="visual_params" default=""/>
+    <xacro:arg name="joint_limit_params" default="$(find ur_description)/config/ur5e/joint_limits.yaml"/>
+    <xacro:arg name="physical_params" default="$(find ur_description)/config/ur5e/physical_parameters.yaml"/>
+    <xacro:arg name="kinematics_params" default="$(find ur_description)/config/ur5e/default_kinematics.yaml"/>
+    <xacro:arg name="visual_params" default="$(find ur_description)/config/ur5e/visual_parameters.yaml"/>
     <xacro:arg name="transmission_hw_interface" default="hardware_interface/EffortJointInterface"/>
     <xacro:arg name="safety_limits" default="false"/>
     <xacro:arg name="safety_pos_margin" default="0.15"/>
@@ -38,7 +38,10 @@
     </joint>
 
     <!-- Use the laser scanner macro to attach it to a specific link -->
-    <xacro:laser_scanner parent_link="wrist_3_link" position="0 0.1 0.1"/>
+    <xacro:laser_scanner parent_link="tool0" position="0 -0.1 0"/>
+
+    <!-- Include the cone end-effector and attach to the flange -->
+    <xacro:welding_eff parent_link="tool0" position="0 0 0.01"/>
 
 </robot>
 
