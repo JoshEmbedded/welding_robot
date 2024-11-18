@@ -1,0 +1,21 @@
+<launch>
+  
+    <param name="robot_description" command="$(find xacro)/xacro $(find alpaka_demo)/include/urdf/laser_scanner.xacro" />
+  
+     <!-- Start Gazebo -->
+    <include file="$(find gazebo_ros)/launch/empty_world.launch">
+        <arg name="paused" value="true"/>
+        <arg name="use_sim_time" value="true"/>
+    </include>
+    
+    <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" /> 
+    
+    <!-- Publish TFs using robot_state_publisher -->
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen" />
+ 
+    <!-- Spawn the robot in Gazebo -->
+    <node name="spawn_laser_scanner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" 
+        args="-urdf -model laser_scanner_test -param robot_description" />
+  
+    
+</launch>
