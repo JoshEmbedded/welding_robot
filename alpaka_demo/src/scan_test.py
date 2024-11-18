@@ -5,7 +5,9 @@ import tf
 from sensor_msgs.msg import LaserScan
 import numpy as np
 import math
-
+import tf
+import tf2_ros
+from tf2_ros import TransformException
 
 laser_data_buffer = deque(maxlen=10)  # Store the last 10 messages
 new_data = True
@@ -90,10 +92,37 @@ def calculate_pose(laser_scan, scan_index):
     # Shutdown the node after processing is complete
     rospy.signal_shutdown("Pose calculation complete.")  # Gracefully shuts down the node
 
+def getTransform():
+    
+    # Create a tf2 Buffer and Listener
+    tf_buffer = tf2_ros.Buffer()
+    listener = tf2_ros.TransformListener(tf_buffer)
+
+    # Wait for the listener to start receiving transforms
+    rospy.sleep(1.0)
+    
+    try:
+        # Look up the transform from the base_link (robot base) to the laser (sensor frame)
+        transform = tf_buffer.lookup_transform('base_link', 'laser_scanner_link', rospy.Time(0))  # 'laser_frame' is the frame of your sensor
+        rospy.loginfo("Transform: %s", transform)
+
+        # Access the translation and rotation from the transform
+        translation = transform.transform.translation
+        rotation = transform.transform.rotation
+
+        rospy.loginfo(f"Translation: x={translation.x}, y={translation.y}, z={translation.z}")
+        rospy.loginfo(f"Rotation: x={rotation.x}, y={rotation.y}, z={rotation.z}, w={rotation.w}")
+
+        return transform
+    
+    except TransformException as e:
+        rospy.logwarn("Could not get transform: %s", e)
+        
 
 if __name__ == '__main__':
     rospy.init_node('test_example_node', anonymous=True)
     
+    getTransform()
     # Subscribe to the /scan topic
     rospy.Subscriber('/laser_scan', LaserScan, laser_scan_callback)
     
