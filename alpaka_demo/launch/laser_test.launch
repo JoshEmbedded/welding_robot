@@ -1,8 +1,14 @@
 <launch>
   
     <param name="robot_description" command="$(find xacro)/xacro $(find alpaka_demo)/include/urdf/laser_scanner.xacro" />
-  
+    <arg name="world_pose" default="-x 0 -y 0.1 -z 0 -R 0 -P 0 -Y 0" doc="Pose to spawn the robot at"/>
      <!-- Start Gazebo -->
+    
+     <!-- robot_state_publisher configuration -->
+    <arg name="tf_prefix" default="" doc="tf_prefix used for the robot."/>
+    <arg name="tf_pub_rate" default="500" doc="Rate at which robot_state_publisher should publish transforms."/>
+
+
     <include file="$(find gazebo_ros)/launch/empty_world.launch">
         <arg name="paused" value="true"/>
         <arg name="use_sim_time" value="true"/>
@@ -10,12 +16,17 @@
     
     <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher" /> 
     
-    <!-- Publish TFs using robot_state_publisher -->
-    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" output="screen" />
- 
+    <!-- Robot state publisher -->
+    <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
+        <param name="publish_frequency" type="double" value="$(arg tf_pub_rate)" />
+        <param name="tf_prefix" value="$(arg tf_prefix)" />
+    </node>
     <!-- Spawn the robot in Gazebo -->
     <node name="spawn_laser_scanner" pkg="gazebo_ros" type="spawn_model" respawn="false" output="screen" 
-        args="-urdf -model laser_scanner_test -param robot_description" />
+        args="-urdf -model laser_scanner_test $(arg world_pose) -param robot_description" />
   
+      <!-- If needed, broadcast static tf for robot root -->
+    <node pkg="tf2_ros" type="static_transform_publisher" name="virtual_joint_broadcaster_0" args="0 0 0 0 0 0 world base_link" />
+
     
 </launch>

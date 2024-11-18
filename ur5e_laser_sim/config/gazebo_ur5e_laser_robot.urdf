@@ -423,9 +423,9 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.1" />
+            <mass value="1e-6" />
             <origin xyz="0 0 0" rpy="1.57 0 0" />
-            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+            <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0.0" ixz="0.0" iyz="0.0" />
         </inertial>
     </link>
     <!-- Attach the laser scanner to a parent link -->
@@ -440,7 +440,7 @@
     <!-- Define the laser sensor and attach the plugin -->
     <gazebo reference="laser_scanner_link">
         <sensor name="laser_scan" type="ray">
-            <origin xyz="0 -0.1 0" rpy="0 0 0"/>
+            <origin xyz="0 0 0" rpy="0 0 0"/>
             <ray>
                 <scan>
                     <horizontal>
@@ -481,9 +481,9 @@
             </geometry>
         </collision>
         <inertial>
-            <mass value="0.1" />
+            <mass value="1e-6" />
             <origin xyz="0 0 0.075" rpy="0 0 0" />
-            <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+            <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0.0" ixz="0.0" iyz="0.0" />
         </inertial>
     </link>
     <gazebo reference="welding_eff_link">

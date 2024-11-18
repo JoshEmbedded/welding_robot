@@ -3,24 +3,32 @@ project(alpaka_demo)
 
 ## Find required catkin and Gazebo ROS packages
 find_package(catkin REQUIRED COMPONENTS
-  geometry_msgs
   roscpp
   rospy
   sensor_msgs
+  geometry_msgs
   std_msgs
+  moveit_core
+  moveit_ros_planning_interface
 )
 
 find_package(gazebo_ros REQUIRED)
 
-## Include directories
-include_directories(
-  ${GAZEBO_INCLUDE_DIRS}
-  ${catkin_INCLUDE_DIRS}
+catkin_package(
+  INCLUDE_DIRS include
+  LIBRARIES alpaka_demo
+  CATKIN_DEPENDS rospy roscpp std_msgs sensor_msgs geometry_msgs moveit_core moveit_ros_planning_interface gazebo_ros
 )
 
-catkin_package(
-  CATKIN_DEPENDS rospy std_msgs sensor_msgs
+## Specify additional locations of header files
+include_directories(
+  include
+  ${catkin_INCLUDE_DIRS}
+  ${GAZEBO_INCLUDE_DIRS}
+  ${moveit_core_INCLUDE_DIRS}
+  ${moveit_ros_planning_interface_INCLUDE_DIRS}
 )
+
 
 ## Link Gazebo libraries
 link_directories(${GAZEBO_LIBRARY_DIRS})
@@ -32,3 +40,11 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+## Declare a C++ executable
+add_executable(weld_seam_moveIt src/posePlan_moveIt.cpp)
+
+## Add cmake target dependencies of the executable
+add_dependencies(weld_seam_moveIt ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+
+## Link the library to the executable
+target_link_libraries(weld_seam_moveIt ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
