@@ -35,7 +35,7 @@ def find_seam(laser_scan):
     
     # Extract the range data (assuming the ranges are in the 'ranges' field of LaserScan message)
     range_data = np.array(laser_scan.ranges)
-
+    
     range_data[range_data == float('inf')] = np.nan  # Replace 'inf' with NaN
     
      # You can either ignore these values or replace NaNs with the previous valid range.

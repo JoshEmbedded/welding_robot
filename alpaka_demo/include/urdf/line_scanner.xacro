@@ -15,7 +15,7 @@
       <collision>
         <geometry>
           <!-- Collision geometry -->
-          <cylinder radius="0.015" length="0.2"/>
+          <cylinder radius="0.015" length="0.1"/>
         </geometry>
       </collision>
       <inertial>
@@ -71,16 +71,18 @@
   <xacro:macro name="welding_eff" params="parent_link position">
     <link name="welding_eff_link">
       <visual>
+      <origin xyz="-0.025 0 0.0" rpy="0 0 0" />
         <geometry>
           <!-- Define the geometry of the laser scanner (e.g., a cylinder) -->
-          <cylinder radius="0.005" length="0.15"/>
+          <cylinder radius="0.005" length="0.05"/>
         </geometry>
         <material name="welding_eff_material"/>
       </visual>
       <collision>
+        <origin xyz="-0.025 0 0.0" rpy="0 0 0" />
         <geometry>
           <!-- Collision geometry -->
-          <cylinder radius="0.005" length="0.2"/>
+          <cylinder radius="0.005" length="0.05"/>
         </geometry>
       </collision>
       <inertial>
