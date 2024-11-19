@@ -5,25 +5,31 @@
   <xacro:macro name="laser_scanner" params="parent_link position">
     <link name="laser_scanner_link">
       <visual>
+      <origin xyz="0 0 0" rpy="1.57 0 0" />
         <geometry>
           <!-- Define the geometry of the laser scanner (e.g., a cylinder) -->
-          <cylinder radius="0.025" length="0.1"/>
+          <cylinder radius="0.015" length="0.1"/>
         </geometry>
         <material name="laser_scanner_material"/>
       </visual>
       <collision>
         <geometry>
           <!-- Collision geometry -->
-          <cylinder radius="0.025" length="0.2"/>
+          <cylinder radius="0.015" length="0.2"/>
         </geometry>
       </collision>
+      <inertial>
+            <mass value="1e-6" />
+            <origin xyz="0 0 0" rpy="1.57 0 0" />
+            <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0.0" ixz="0.0" iyz="0.0" />
+      </inertial>
     </link>
 
     <!-- Attach the laser scanner to a parent link -->
     <joint name="laser_scanner_joint" type="fixed">
       <parent link="${parent_link}"/>
       <child link="laser_scanner_link"/>
-      <origin xyz="${position}" rpy="0 -1.57 0"/>
+      <origin xyz="${position}" rpy="0 0 0"/>
     </joint>
 
     <gazebo reference="laser_scanner_link">
@@ -39,8 +45,8 @@
             <horizontal>
               <samples>1000</samples>
               <resolution>1</resolution>
-              <min_angle>-0.1</min_angle>
-              <max_angle>0.1</max_angle>
+              <min_angle>-0.474</min_angle>
+              <max_angle>0.474</max_angle>
             </horizontal>
           </scan>
           <range>
@@ -77,6 +83,11 @@
           <cylinder radius="0.005" length="0.2"/>
         </geometry>
       </collision>
+      <inertial>
+            <mass value="1e-6" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
+            <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0.0" ixz="0.0" iyz="0.0" />
+      </inertial>
     </link>
 
     <gazebo reference="welding_eff_link">
@@ -86,7 +97,7 @@
     <joint name="cone_approx_joint" type="fixed">
       <parent link="${parent_link}"/>
       <child link="welding_eff_link"/>
-      <origin xyz="${position}" rpy="0 0 0"/>
+      <origin xyz="${position}" rpy="0 1.57 0"/>
     </joint>
 
     <link name="tcp_eff"/>

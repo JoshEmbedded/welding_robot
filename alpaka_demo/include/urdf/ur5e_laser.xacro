@@ -38,10 +38,10 @@
     </joint>
 
     <!-- Use the laser scanner macro to attach it to a specific link -->
-    <xacro:laser_scanner parent_link="flange" position="0 -0.1 0"/>
+    <xacro:laser_scanner parent_link="flange" position="0 0 -0.05"/>
 
     <!-- Include the cone end-effector and attach to the flange -->
-    <xacro:welding_eff parent_link="flange" position="0 0 0.01"/>
+    <xacro:welding_eff parent_link="flange" position="0 0 0"/>
 
 </robot>
 
