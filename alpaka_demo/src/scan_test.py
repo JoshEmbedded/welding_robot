@@ -77,6 +77,7 @@ def calculate_pose(laser_scan, scan_index):
     
     # Get the range (distance) at the given index
     r = laser_scan.ranges[scan_index]
+    r = r - 0.02 #remove small distance to keep a gap for welding
     
     # If the range is invalid (NaN or infinite), return None
     if r == float('Inf') or r == float('NaN'):
@@ -151,11 +152,18 @@ def convertLaserTransform(x, y, angle):
         laser_pose.pose.position.y = y
         laser_pose.pose.position.z = 0  # Assuming the laser scanner is on a 2D plane
         
-        quartnernion = tf.transformations.quaternion_from_euler(0, 0, angle)
-        laser_pose.pose.orientation.x = quartnernion[0]
-        laser_pose.pose.orientation.y = quartnernion[1]
-        laser_pose.pose.orientation.z = quartnernion[2]
-        laser_pose.pose.orientation.w = quartnernion[3]
+        # Calculate the yaw angle representing the direction from the scanner to the point
+        yaw = math.atan2(y, x)  # Angle of vector (x, y) from scanner to point
+        quaternion = tf.transformations.quaternion_from_euler(0, 0, yaw)
+        
+        # Add a rotation to align z-axis with x-axis
+        alignment_quaternion = tf.transformations.quaternion_from_euler(0, math.pi / 2, 0)
+        final_quaternion = tf.transformations.quaternion_multiply(alignment_quaternion, quaternion)
+
+        laser_pose.pose.orientation.x = final_quaternion[0]
+        laser_pose.pose.orientation.y = final_quaternion[1]
+        laser_pose.pose.orientation.z = final_quaternion[2]
+        laser_pose.pose.orientation.w = final_quaternion[3]
         
         # Transform the laser scanner pose to base_link frame
         seam_pose = do_transform_pose(laser_pose, transform)
@@ -164,7 +172,7 @@ def convertLaserTransform(x, y, angle):
         transformed_x = transformed_pose.pose.position.x
         transformed_y = transformed_pose.pose.position.y
         transformed_z = transformed_pose.pose.position.z
-        transformed_theta = tf.transformations.euler_from_quaternion([
+        transformed_yaw = tf.transformations.euler_from_quaternion([
             transformed_pose.pose.orientation.x,
             transformed_pose.pose.orientation.y,
             transformed_pose.pose.orientation.z,
@@ -173,7 +181,7 @@ def convertLaserTransform(x, y, angle):
         
         weld_seam_pose_pub.publish(seam_pose)
         rospy.loginfo(f"Publishing weld seam pose: x={transformed_x}, y={transformed_y}, z={transformed_z}")
-        return transformed_x, transformed_y, transformed_theta
+        return transformed_x, transformed_y, transformed_yaw
 
     except tf2_ros.TransformException as e:
         rospy.signal_shutdown(f"Could not get transform: {e}")

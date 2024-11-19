@@ -32,7 +32,7 @@ class WeldSeamPoseSubscriber:
         rospy.loginfo(f"Received pose: {self.current_pose}")
         self.create_arrow_marker(self.current_pose)
         
-    def create_arrow_marker(self, pose_stamped, marker_id=0, scale=0.1, color=(1.0, 0.0, 0.0, 1.0)):
+    def create_arrow_marker(self, pose_stamped, marker_id=0, scale=0.01, color=(1.0, 0.0, 0.0, 1.0)):
         """
         Creates an arrow marker for a PoseStamped message.
 

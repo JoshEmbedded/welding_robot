@@ -109,14 +109,13 @@ bool handlePlanError(moveit::core::MoveItErrorCode my_plan, std::string planning
 }
 
 bool computeTrajectory(moveit::planning_interface::MoveGroupInterface &move_group,
-                       const geometry_msgs::PoseStamped &target_pose,
+                       const geometry_msgs::PoseStamped &goal_pose,
                        moveit::planning_interface::MoveGroupInterface::Plan &plan)
 {
     // Lock the mutex if necessary
     mtx.lock();
 
-    // Set the target pose directly
-    move_group.setPoseTarget(target_pose);
+    move_group.setPoseTarget(goal_pose, "welding_eff_link");
 
     // Plan to the target pose
     bool success = handlePlanError(move_group.plan(plan), "planning");
@@ -163,8 +162,12 @@ int main(int argc, char **argv)
     moveit::planning_interface::MoveGroupInterface move_group(PLANNING_GROUP);
     moveit::planning_interface::MoveGroupInterface::Plan my_plan;
 
+    
+    ros::Duration(1.0).sleep(); // Wait before checking again
+
     while (ros::ok())
     {
+        
         if (pose_received)
         {
             // Call the computeTrajectory function with the pose and joint states

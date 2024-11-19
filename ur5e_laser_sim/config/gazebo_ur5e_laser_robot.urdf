@@ -419,7 +419,7 @@
         <collision>
             <geometry>
                 <!-- Collision geometry -->
-                <cylinder length="0.2" radius="0.015" />
+                <cylinder length="0.1" radius="0.015" />
             </geometry>
         </collision>
         <inertial>
@@ -476,7 +476,7 @@
         <collision>
             <geometry>
                 <!-- Collision geometry -->
-                <cylinder length="0.2" radius="0.005" />
+                <cylinder length="0.15" radius="0.005" />
                 <origin xyz="0 0 0" rpy="0 0 0" />
             </geometry>
         </collision>
