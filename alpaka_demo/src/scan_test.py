@@ -31,6 +31,55 @@ def laser_scan_callback(msg):
         find_seam(laser_data)
         new_data = False  # Set to False after processing
 
+import numpy as np
+
+def interpolate_nan_with_tolerance(data, tolerance):
+    """
+    Interpolates NaN values in a 1D array based on surrounding valid values within a certain tolerance.
+
+    Parameters:
+        data (np.ndarray): The input 1D array containing `NaN` values.
+        tolerance (float): The maximum allowed gap (in indices) for interpolation to occur.
+
+    Returns:
+        np.ndarray: A new array with interpolated values for `NaN` elements within the tolerance range.
+    """
+    # Create a copy to avoid modifying the original data
+    data_interpolated = np.copy(data)
+
+    # Find indices of NaN values
+    nan_indices = np.where(np.isnan(data))[0]
+
+    for nan_idx in nan_indices:
+        # Look for valid values before and after the current NaN index
+        valid_before = None
+        valid_after = None
+
+        # Search backward for the nearest valid value
+        for i in range(nan_idx - 1, -1, -1):
+            if not np.isnan(data[i]):
+                valid_before = (i, data[i])
+                break
+
+        # Search forward for the nearest valid value
+        for i in range(nan_idx + 1, len(data)):
+            if not np.isnan(data[i]):
+                valid_after = (i, data[i])
+                break
+
+        # Interpolate only if both valid_before and valid_after are within the tolerance range
+        if valid_before and valid_after:
+            gap_before = nan_idx - valid_before[0]
+            gap_after = valid_after[0] - nan_idx
+
+            if gap_before <= tolerance and gap_after <= tolerance:
+                # Linear interpolation
+                value = (valid_before[1] * gap_after + valid_after[1] * gap_before) / (gap_before + gap_after)
+                data_interpolated[nan_idx] = value
+
+    return data_interpolated
+
+
 def find_seam(laser_scan):
     
     # Extract the range data (assuming the ranges are in the 'ranges' field of LaserScan message)
@@ -38,8 +87,14 @@ def find_seam(laser_scan):
     
     range_data[range_data == float('inf')] = np.nan  # Replace 'inf' with NaN
     
+    rospy.loginfo(f"Processed range data: {range_data}")
+    
+    range_data = interpolate_nan_with_tolerance(range_data, 3)
+    
+    rospy.loginfo(f"Interpolated: {range_data}")
+    
      # You can either ignore these values or replace NaNs with the previous valid range.
-    range_data = np.nan_to_num(range_data, nan=np.nan)  # This will turn NaNs into a default value like zero
+    # range_data = np.nan_to_num(range_data, nan=np.nan)  # This will turn NaNs into a default value like zero
     
     # Print the range data for debugging
     # rospy.loginfo(f"Range data: {range_data}")
@@ -48,8 +103,12 @@ def find_seam(laser_scan):
     local_maxima = []
     local_minima = []
     edge = False
-    index = int()
+    index = -1
     for i in range(1, len(range_data) - 1):  # Avoid the first and last elements
+        # Skip if the current or neighboring values are NaN
+        if np.isnan(range_data[i-1]) or np.isnan(range_data[i]) or np.isnan(range_data[i+1]):
+            continue  # Skip this iteration
+        
         if range_data[i-1] < range_data[i] > range_data[i+1]:  # Local maxima
             local_maxima.append(i)
             rospy.loginfo(f"local maxima found at indices: {i}, with range: {range_data[i]}.")
@@ -62,7 +121,7 @@ def find_seam(laser_scan):
             edge = True
     
     if edge:
-        rospy.loginfo("Change in direction detected: %s", edge)
+        rospy.loginfo("Change in direction detected:")
         calculate_pose(laser_scan, index)
         
     else:
@@ -77,7 +136,10 @@ def calculate_pose(laser_scan, scan_index):
     
     # Get the range (distance) at the given index
     r = laser_scan.ranges[scan_index]
-    r = r - 0.02 #remove small distance to keep a gap for welding
+    if r - 0.02 < 0.074:
+        r = 0.074
+    else:
+        r = r - 0.02 #remove small distance to keep a gap for welding
     
     # If the range is invalid (NaN or infinite), return None
     if r == float('Inf') or r == float('NaN'):
