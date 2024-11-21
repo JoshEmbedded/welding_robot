@@ -88,14 +88,10 @@
       </inertial>
     </link>
 
-    <gazebo reference="welding_eff_link">
-      <material>Gazebo/Blue</material>
-    </gazebo>
-
-    <joint name="cone_approx_joint" type="fixed">
+    <joint name="welding_eff_joint" type="fixed">
       <parent link="${parent_link}"/>
       <child link="welding_eff_link"/>
-      <origin xyz="${position}" rpy="3.14 -1.57 0"/>
+      <origin xyz="${position}" rpy="0 1.57 0"/>
     </joint>
 
     <link name="tcp_eff"/>
