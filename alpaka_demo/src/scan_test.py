@@ -136,11 +136,11 @@ def calculate_pose(laser_scan, scan_index):
     
     # Get the range (distance) at the given index
     r = laser_scan.ranges[scan_index]
-    if r - 0.02 < 0.074:
-        r = 0.074
-    else:
-        r = r - 0.02 #remove small distance to keep a gap for welding
     
+    # update r to ensure end-effector doesn't move less than min sensor range (0.074)
+    r = r - 0.074
+    
+    rospy.loginfo(f"updated range: {r}")
     # If the range is invalid (NaN or infinite), return None
     if r == float('Inf') or r == float('NaN'):
         rospy.logwarn(f"Invalid range value at index {scan_index}.")

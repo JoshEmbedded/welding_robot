@@ -469,18 +469,14 @@
     <link name="welding_eff_link">
         <origin xyz="0 0 0" rpy="0 0 0.0" />
         <visual>
-            <origin xyz="0 0 -0.025" rpy="0 0 -0.05" />
+            <origin xyz="0 0 0" rpy="0 0 0" />
             <geometry>
-                <!-- Define the geometry of the laser scanner (e.g., a cylinder) -->
-                <cylinder length="0.05" radius="0.005" />
+                <mesh filename="package://alpaka_demo/include/urdf/meshes/welding_eff/Brennerhalter_with_Sensor.dae"/> 
             </geometry>
         </visual>
         <collision>
-            <origin xyz="0 0 -0.025" rpy="0 0 0.0" />
             <geometry>
-                <!-- Collision geometry -->
-                <cylinder length="0.05" radius="0.005" />
-                <origin xyz="0 0 0" rpy="0 0 -0.05" />
+                <mesh filename="package://alpaka_demo/include/urdf/meshes/welding_eff/Brennerhalter_with_Sensor.stl"/> 
             </geometry>
         </collision>
         <inertial>
@@ -495,7 +491,7 @@
     <joint name="cone_approx_joint" type="fixed">
         <parent link="flange"/>
         <child link="welding_eff_link" />
-        <origin rpy="0 1.57 0" xyz="0.05 0 0.0" />
+        <origin rpy="3.14 -1.57 0" xyz="0.05 0 0.0" />
     </joint>
     <link name="tcp_eff" />
     <joint name="tcp_eff_cone_joint" type="fixed">

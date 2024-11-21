@@ -71,19 +71,15 @@
   <xacro:macro name="welding_eff" params="parent_link position">
     <link name="welding_eff_link">
       <visual>
-      <origin xyz="-0.025 0 0.0" rpy="0 0 0" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
         <geometry>
-          <!-- Define the geometry of the laser scanner (e.g., a cylinder) -->
-          <cylinder radius="0.005" length="0.05"/>
-        </geometry>
-        <material name="welding_eff_material"/>
-      </visual>
-      <collision>
-        <origin xyz="-0.025 0 0.0" rpy="0 0 0" />
-        <geometry>
-          <!-- Collision geometry -->
-          <cylinder radius="0.005" length="0.05"/>
-        </geometry>
+                <mesh filename="package://alpaka_demo/include/urdf/meshes/welding_eff/Brennerhalter_with_Sensor.dae"/> 
+            </geometry>
+        </visual>
+        <collision>
+            <geometry>
+                <mesh filename="package://alpaka_demo/include/urdf/meshes/welding_eff/Brennerhalter_with_Sensor.stl"/> 
+            </geometry>
       </collision>
       <inertial>
             <mass value="1e-6" />
@@ -99,7 +95,7 @@
     <joint name="cone_approx_joint" type="fixed">
       <parent link="${parent_link}"/>
       <child link="welding_eff_link"/>
-      <origin xyz="${position}" rpy="0 1.57 0"/>
+      <origin xyz="${position}" rpy="3.14 -1.57 0"/>
     </joint>
 
     <link name="tcp_eff"/>
