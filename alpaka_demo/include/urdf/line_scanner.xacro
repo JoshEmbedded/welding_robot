@@ -4,37 +4,14 @@
   <!-- Define the laser scanner macro -->
   <xacro:macro name="laser_scanner" params="parent_link position">
     <link name="laser_scanner_link">
-      <visual>
-      <origin xyz="0 0 0" rpy="1.57 0 0" />
-        <geometry>
-          <!-- Define the geometry of the laser scanner (e.g., a cylinder) -->
-          <cylinder radius="0.015" length="0.1"/>
-        </geometry>
-        <material name="laser_scanner_material"/>
-      </visual>
-      <collision>
-        <geometry>
-          <!-- Collision geometry -->
-          <cylinder radius="0.015" length="0.1"/>
-        </geometry>
-      </collision>
-      <inertial>
-            <mass value="1e-6" />
-            <origin xyz="0 0 0" rpy="1.57 0 0" />
-            <inertia ixx="1e-6" iyy="1e-6" izz="1e-6" ixy="0.0" ixz="0.0" iyz="0.0" />
-      </inertial>
     </link>
 
     <!-- Attach the laser scanner to a parent link -->
     <joint name="laser_scanner_joint" type="fixed">
       <parent link="${parent_link}"/>
       <child link="laser_scanner_link"/>
-      <origin xyz="${position}" rpy="0 0 0"/>
+      <origin rpy="0 -0.890118 -0.28797" xyz="-0.02684 0.07237 0.52914"/>
     </joint>
-
-    <gazebo reference="laser_scanner_link">
-      <material>Gazebo/Red</material>
-    </gazebo>
 
           <!-- Define the laser sensor and attach the plugin -->
     <gazebo reference="laser_scanner_link">
@@ -54,6 +31,13 @@
             <max>10.0</max>
             <resolution>0.01</resolution>
           </range>
+          <collision>
+            <surface>
+              <contact>
+                <collide_bitmask>0b01</collide_bitmask> <!-- Set bitmask -->
+              </contact>
+            </surface>
+          </collision>
         </ray>
         
         <!-- Add Gazebo Laser Scanner Plugin -->
@@ -71,15 +55,22 @@
   <xacro:macro name="welding_eff" params="parent_link position">
     <link name="welding_eff_link">
       <visual>
-      <origin xyz="0 0 0" rpy="0 0 0" />
-        <geometry>
+        <origin xyz="0 0 -0.05" rpy="0 0 0" />
+        <geometry>        
                 <mesh filename="package://alpaka_demo/include/urdf/meshes/welding_eff/Brennerhalter_with_Sensor.dae"/> 
             </geometry>
         </visual>
-        <collision>
-            <geometry>
-                <mesh filename="package://alpaka_demo/include/urdf/meshes/welding_eff/Brennerhalter_with_Sensor.stl"/> 
-            </geometry>
+      <collision>
+        <origin xyz="0 0 -0.05" rpy="0 0 0" />
+        <geometry>
+          <mesh filename="package://alpaka_demo/include/urdf/meshes/welding_eff/Brennerhalter_with_Sensor.stl"/> 
+        </geometry>
+        <laser_retro>0</laser_retro> <!-- Makes the collision invisible to laser rays -->
+        <surface>
+          <contact>
+            <collide_bitmask>0b10</collide_bitmask> <!-- Set bitmask -->
+          </contact>
+        </surface>
       </collision>
       <inertial>
             <mass value="1e-6" />
@@ -91,15 +82,15 @@
     <joint name="welding_eff_joint" type="fixed">
       <parent link="${parent_link}"/>
       <child link="welding_eff_link"/>
-      <origin xyz="${position}" rpy="0 1.57 0"/>
+      <origin rpy="0 1.57 0" xyz="0.05 0 0" />
     </joint>
 
     <link name="tcp_eff"/>
 
-    <joint name="tcp_eff_cone_joint" type="fixed">
+    <joint name="tcp_eff_joint" type="fixed">
       <parent link="welding_eff_link"/>
       <child link="tcp_eff"/>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <origin rpy="0 0.68 0" xyz="0.04561 0 0.61858" />
     </joint>
 
   </xacro:macro>
