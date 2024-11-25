@@ -10,12 +10,15 @@ import tf2_ros
 from tf2_ros import TransformException
 from tf2_geometry_msgs import do_transform_pose
 import geometry_msgs.msg 
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, PoseArray
 
 laser_data_buffer = deque(maxlen=10)  # Store the last 10 messages
 new_data = True
 laser_data = LaserScan()
 global seam_pose
+
+# Store detected seam points
+seam_points = []
 
 # Create a publisher (global to avoid creating it repeatedly in the function)
 weld_seam_pose_pub = rospy.Publisher('/weld_seam_pose', PoseStamped, queue_size=10)
@@ -28,56 +31,97 @@ def laser_scan_callback(msg):
     global new_data, laser_data
     if new_data:
         laser_data = msg
-        find_seam(laser_data)
+        find_seam_intersections(laser_data)
+        # find_seam(laser_data)
         new_data = False  # Set to False after processing
 
-import numpy as np
 
-def interpolate_nan_with_tolerance(data, tolerance):
+def find_seam_intersections(laser_scan):
     """
-    Interpolates NaN values in a 1D array based on surrounding valid values within a certain tolerance.
+    Detects seam by finding intersection points of vectors formed between laser scan points.
 
     Parameters:
-        data (np.ndarray): The input 1D array containing `NaN` values.
-        tolerance (float): The maximum allowed gap (in indices) for interpolation to occur.
+        laser_scan (list or np.ndarray): Laser scan range data.
 
     Returns:
-        np.ndarray: A new array with interpolated values for `NaN` elements within the tolerance range.
+        list: A list of intersection points (x, y) in 2D space.
     """
-    # Create a copy to avoid modifying the original data
-    data_interpolated = np.copy(data)
+    
+    # Extract the range data (assuming the ranges are in the 'ranges' field of LaserScan message)
+    range_data = np.array(laser_scan.ranges)
+    
+    range_data[range_data == float('inf')] = np.nan  # Replace 'inf' with NaN
+    
+    
+    angle_min = laser_scan.angle_min
+    angle_increment = laser_scan.angle_increment
+    
+    # Step 1: Convert laser scan ranges to 2D points
+    angles = np.arange(angle_min, angle_min + len(range_data) * angle_increment, angle_increment)
+    points = np.array([
+        (r * np.cos(a), r * np.sin(a)) if np.isfinite(r) else (np.nan, np.nan)
+        for r, a in zip(range_data, angles)
+    ])
+    
+    intersection_points = []
 
-    # Find indices of NaN values
-    nan_indices = np.where(np.isnan(data))[0]
-
-    for nan_idx in nan_indices:
-        # Look for valid values before and after the current NaN index
-        valid_before = None
-        valid_after = None
-
-        # Search backward for the nearest valid value
-        for i in range(nan_idx - 1, -1, -1):
-            if not np.isnan(data[i]):
-                valid_before = (i, data[i])
-                break
-
-        # Search forward for the nearest valid value
-        for i in range(nan_idx + 1, len(data)):
-            if not np.isnan(data[i]):
-                valid_after = (i, data[i])
-                break
-
-        # Interpolate only if both valid_before and valid_after are within the tolerance range
-        if valid_before and valid_after:
-            gap_before = nan_idx - valid_before[0]
-            gap_after = valid_after[0] - nan_idx
-
-            if gap_before <= tolerance and gap_after <= tolerance:
-                # Linear interpolation
-                value = (valid_before[1] * gap_after + valid_after[1] * gap_before) / (gap_before + gap_after)
-                data_interpolated[nan_idx] = value
-
-    return data_interpolated
+    threshold = 0.01
+    new_vector = True
+    stored_gradients = []
+    
+    for i in range(len(points)-2):
+        
+        p1, p2 = points[i], points[i+1]
+        
+        # Skip if any of the points are invalid
+        if np.isnan(p1).any() or np.isnan(p2).any():
+            continue
+        
+        vector = np.array(p2) - np.array(p1)
+        gradient = (p2[1]-p1[1])/(p2[0]-p1[0])
+        
+        if new_vector:
+            intersection_points.append(p1)
+            prev_gradient = gradient
+            stored_gradients.append(prev_gradient)
+            new_vector = False
+            
+            continue
+        
+        # Compare vector direction based on magnitude
+        if abs(prev_gradient - gradient) <= threshold:
+            continue
+        else:
+            # Store the previous vector when a significant change is detected
+            # rospy.loginfo(f'Prev vector {prev_gradient}, current vector {gradient} and point: {p1}')
+            new_vector = True
+            continue
+    
+    # Store the last gradient after the final iteration
+    stored_gradients.append(prev_gradient)
+            
+    # Make sure we have enough vectors to compute intersection
+    if len(stored_gradients) < 2:
+        print("Not enough gradients to compute an intersection.")
+        return []
+    
+    # Assuming stored_gradients[0] and stored_gradients[1] are the gradients of the two lines
+    m1, m2 = stored_gradients[0], stored_gradients[1]
+    
+    # Check if gradients are too similar
+    if abs(m1 - m2) < 1e-6:
+        print("Gradients too similar; lines may be parallel.")
+        return None
+    
+    # Compute the y-intercepts of both lines (b1 and b2)
+    b1 = intersection_points[0][1] - m1 * intersection_points[0][0]
+    b2 = intersection_points[1][1] - m2 * intersection_points[1][0]
+    
+    # Calculate the intersection point
+    x_intersection = (b2 - b1) / (m1 - m2)
+    y_intersection = m1 * x_intersection + b1
+    
+    return convertLaserTransform(x_intersection, y_intersection)
 
 
 def find_seam(laser_scan):
@@ -136,10 +180,10 @@ def calculate_pose(laser_scan, scan_index):
     
     # Get the range (distance) at the given index
     r = laser_scan.ranges[scan_index]
-    if r - 0.02 < 0.074:
-        r = 0.074
-    else:
-        r = r - 0.02 #remove small distance to keep a gap for welding
+    # if r - 0.02 < 0.074:
+    #     r = 0.074
+    # else:
+    #     r = r - 0.02 #remove small distance to keep a gap for welding
     
     # If the range is invalid (NaN or infinite), return None
     if r == float('Inf') or r == float('NaN'):
@@ -157,37 +201,11 @@ def calculate_pose(laser_scan, scan_index):
     rospy.loginfo("calculated y position from laser data: %f ", y)
     rospy.loginfo("calculated angle from laser data: %f ", angle)
     
-    convertLaserTransform(x, y, angle)
+    convertLaserTransform(x, y)
     # # Shutdown the node after processing is complete
     # rospy.signal_shutdown("Pose calculation complete.")  # Gracefully shuts down the node
 
-def getTransform():
-    
-    # Create a tf2 Buffer and Listener
-    tf_buffer = tf2_ros.Buffer()
-    listener = tf2_ros.TransformListener(tf_buffer)
-
-    # Wait for the listener to start receiving transforms
-    rospy.sleep(1.0)
-    
-    try:
-        # Look up the transform from the base_link (robot base) to the laser (sensor frame)
-        transform = tf_buffer.lookup_transform('base_link', 'laser_scanner_link', rospy.Time(0))  # 'laser_frame' is the frame of your sensor
-        rospy.loginfo("Transform: %s", transform)
-
-        # Access the translation and rotation from the transform
-        translation = transform.transform.translation
-        rotation = transform.transform.rotation
-
-        rospy.loginfo(f"Translation: x={translation.x}, y={translation.y}, z={translation.z}")
-        rospy.loginfo(f"Rotation: x={rotation.x}, y={rotation.y}, z={rotation.z}, w={rotation.w}")
-
-        return transform
-    
-    except TransformException as e:
-        rospy.signal_shutdown("Could not get transform: %s", e)
-
-def convertLaserTransform(x, y, angle):
+def convertLaserTransform(x, y):
     """
     Convert a position from laser_scanner_link to base_link.
 
@@ -243,6 +261,7 @@ def convertLaserTransform(x, y, angle):
         
         weld_seam_pose_pub.publish(seam_pose)
         rospy.loginfo(f"Publishing weld seam pose: x={transformed_x}, y={transformed_y}, z={transformed_z}")
+        
         return transformed_x, transformed_y, transformed_yaw
 
     except tf2_ros.TransformException as e:
