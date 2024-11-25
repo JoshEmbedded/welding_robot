@@ -121,6 +121,8 @@ def find_seam_intersections(laser_scan):
     x_intersection = (b2 - b1) / (m1 - m2)
     y_intersection = m1 * x_intersection + b1
     
+ 
+    
     return convertLaserTransform(x_intersection, y_intersection)
 
 
@@ -224,6 +226,17 @@ def convertLaserTransform(x, y):
         # Get the transform from laser_scanner_link to base_link
         transform = tf_buffer.lookup_transform('base_link', 'laser_scanner_link', rospy.Time(0))
 
+        # Offset to ensure gap between end-effector and seam
+        offset_distance = 0.02 
+        # Calculate the yaw angle representing the direction from the scanner to the point
+        yaw = math.atan2(y, x)  # Angle of vector (x, y) from scanner to point
+        
+        # Apply the offset in the direction of yaw
+        x -= offset_distance * math.cos(yaw)
+        y -= offset_distance * math.sin(yaw)
+        
+        quaternion = tf.transformations.quaternion_from_euler(0, 0, yaw)
+        
         # Create a PoseStamped message for the laser scanner pose in its own frame
         laser_pose = geometry_msgs.msg.PoseStamped()
         laser_pose.header.frame_id = 'laser_scanner_link'
@@ -232,9 +245,7 @@ def convertLaserTransform(x, y):
         laser_pose.pose.position.y = y
         laser_pose.pose.position.z = 0  # Assuming the laser scanner is on a 2D plane
         
-        # Calculate the yaw angle representing the direction from the scanner to the point
-        yaw = math.atan2(y, x)  # Angle of vector (x, y) from scanner to point
-        quaternion = tf.transformations.quaternion_from_euler(0, 0, yaw)
+        
         
         # Add a rotation to align z-axis with x-axis
         alignment_quaternion = tf.transformations.quaternion_from_euler(0, math.pi / 2, 0)

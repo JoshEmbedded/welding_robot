@@ -1,0 +1,3 @@
+sensor_msgs/LaserScan laser_scan
+---
+geometry_msgs/PoseStamped seam_pose

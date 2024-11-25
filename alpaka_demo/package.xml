@@ -18,9 +18,11 @@
   <build_depend>std_msgs</build_depend>
   <build_depend>moveit_core</build_depend>
   <build_depend>moveit_ros_planning_interface</build_depend>
+  <build_depend>message_runtime</build_depend>
+  <build_depend>message_generation</build_depend>
   <depend>gazebo_ros</depend>
   <depend>tf</depend>
-
+  <exec_depend>message_runtime</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>rospy</exec_depend>

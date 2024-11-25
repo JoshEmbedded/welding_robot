@@ -10,14 +10,29 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   moveit_core
   moveit_ros_planning_interface
+  message_generation
+  message_runtime
 )
 
 find_package(gazebo_ros REQUIRED)
 
+add_service_files(
+  FILES
+  SeamDetection.srv
+)
+
+
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  sensor_msgs
+  geometry_msgs
+)
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES alpaka_demo
-  CATKIN_DEPENDS rospy roscpp std_msgs sensor_msgs geometry_msgs moveit_core moveit_ros_planning_interface gazebo_ros
+  CATKIN_DEPENDS rospy roscpp std_msgs sensor_msgs geometry_msgs moveit_core moveit_ros_planning_interface gazebo_ros message_runtime
 )
 
 ## Specify additional locations of header files
