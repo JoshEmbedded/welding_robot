@@ -10,13 +10,13 @@
     <joint name="laser_scanner_joint" type="fixed">
       <parent link="${parent_link}"/>
       <child link="laser_scanner_link"/>
-      <origin rpy="0 -0.890118 -0.28797" xyz="-0.02684 0.07237 0.52914"/>
+      <origin rpy="1.8587757 -0.890118 -0.2879793" xyz="-0.02684 0.07237 0.52914" />
     </joint>
 
           <!-- Define the laser sensor and attach the plugin -->
     <gazebo reference="laser_scanner_link">
       <sensor type="ray" name="laser_scan">
-        <origin xyz="${position}" />
+        <origin xyz="0 0 0" rpy="0 0 0"/>
         <ray>
           <scan>
             <horizontal>
