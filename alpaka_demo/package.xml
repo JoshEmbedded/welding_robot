@@ -30,6 +30,9 @@
   <exec_depend>moveit_ros_planning_interface</exec_depend>
 
   <export>
-    <!-- Other tools can request additional information be placed here -->
+    <gazebo>
+      <model_path>$(find your_package)/models</model_path>
+    </gazebo>
   </export>
+
 </package>
