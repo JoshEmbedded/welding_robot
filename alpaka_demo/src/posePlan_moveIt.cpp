@@ -115,7 +115,7 @@ bool computeTrajectory(moveit::planning_interface::MoveGroupInterface &move_grou
     // Lock the mutex if necessary
     mtx.lock();
 
-    move_group.setPoseTarget(goal_pose, "welding_eff_link");
+    move_group.setPoseTarget(goal_pose, "tcp_eff");
 
     // Plan to the target pose
     bool success = handlePlanError(move_group.plan(plan), "planning");
@@ -160,6 +160,7 @@ int main(int argc, char **argv)
     // Set up the MoveIt! MoveGroup interface for the UR5e robot
     static const std::string PLANNING_GROUP = "manipulator"; // Replace with your robot's planning group
     moveit::planning_interface::MoveGroupInterface move_group(PLANNING_GROUP);
+    move_group.setEndEffectorLink("tcp_eff");
     moveit::planning_interface::MoveGroupInterface::Plan my_plan;
 
     

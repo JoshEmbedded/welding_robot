@@ -3,7 +3,7 @@
     This is a format for representing semantic information about the robot structure.
     A URDF file must exist for this robot as well, where the joints and the links that are referenced are defined
 -->
-<robot name="ur5e_laser_robot">
+<robot name="ur10e_alpaka">
     <!--GROUPS: Representation of a set of joints and links. This can be useful for specifying DOF to plan for, defining arms, end effectors, etc-->
     <!--LINKS: When a link is specified, the parent joint of that link (if it exists) is automatically included-->
     <!--JOINTS: When a joint is specified, the child link of that joint (which will always exist) is automatically included-->
@@ -29,40 +29,33 @@
         <joint name="wrist_2_joint" value="0"/>
         <joint name="wrist_3_joint" value="0"/>
     </group_state>
-    <group_state name="scan" group="manipulator">
-        <joint name="elbow_joint" value="-2.33"/>
-        <joint name="shoulder_lift_joint" value="-1.85"/>
-        <joint name="shoulder_pan_joint" value="0"/>
-        <joint name="wrist_1_joint" value="-0.350"/>
-        <joint name="wrist_2_joint" value="2.4"/>
-        <joint name="wrist_3_joint" value="0"/>
-    </group_state>
     <group_state name="test" group="manipulator">
         <joint name="elbow_joint" value="2.7"/>
         <joint name="shoulder_lift_joint" value="-2.8"/>
         <joint name="shoulder_pan_joint" value="0"/>
         <joint name="wrist_1_joint" value="-3.045"/>
         <joint name="wrist_2_joint" value="0"/>
-        <joint name="wrist_3_joint" value="0"/>
+        <joint name="wrist_3_joint" value="-1.5707"/>
     </group_state>
     <!--VIRTUAL JOINT: Purpose: this element defines a virtual joint between a robot link and an external frame of reference (considered fixed with respect to the robot)-->
     <virtual_joint name="fixed_base" type="fixed" parent_frame="world" child_link="base_link"/>
     <!--DISABLE COLLISIONS: By default it is assumed that any link of the robot could potentially come into collision with any other link in the robot. This tag disables collision checking between a specified pair of links. -->
     <disable_collisions link1="base_link_inertia" link2="shoulder_link" reason="Adjacent"/>
+    <disable_collisions link1="base_link_inertia" link2="upper_arm_link" reason="Never"/>
+    <disable_collisions link1="base_link_inertia" link2="wrist_1_link" reason="Never"/>
+    <disable_collisions link1="forearm_link" link2="tcp_eff" reason="Never"/>
     <disable_collisions link1="forearm_link" link2="upper_arm_link" reason="Adjacent"/>
     <disable_collisions link1="forearm_link" link2="wrist_1_link" reason="Adjacent"/>
-    <disable_collisions link1="forearm_link" link2="wrist_2_link" reason="Never"/>
-    <disable_collisions link1="laser_scanner_link" link2="welding_eff_link" reason="Adjacent"/>
-    <disable_collisions link1="laser_scanner_link" link2="wrist_2_link" reason="Never"/>
-    <disable_collisions link1="laser_scanner_link" link2="wrist_3_link" reason="Adjacent"/>
     <disable_collisions link1="shoulder_link" link2="upper_arm_link" reason="Adjacent"/>
+    <disable_collisions link1="shoulder_link" link2="wrist_1_link" reason="Never"/>
+    <disable_collisions link1="tcp_eff" link2="welding_eff_link" reason="Adjacent"/>
+    <disable_collisions link1="tcp_eff" link2="wrist_1_link" reason="Never"/>
+    <disable_collisions link1="tcp_eff" link2="wrist_2_link" reason="Never"/>
+    <disable_collisions link1="tcp_eff" link2="wrist_3_link" reason="Never"/>
     <disable_collisions link1="welding_eff_link" link2="wrist_1_link" reason="Never"/>
-    <disable_collisions link1="welding_eff_link" link2="wrist_2_link" reason="Default"/>
+    <disable_collisions link1="welding_eff_link" link2="wrist_2_link" reason="Never"/>
     <disable_collisions link1="welding_eff_link" link2="wrist_3_link" reason="Adjacent"/>
     <disable_collisions link1="wrist_1_link" link2="wrist_2_link" reason="Adjacent"/>
     <disable_collisions link1="wrist_1_link" link2="wrist_3_link" reason="Never"/>
     <disable_collisions link1="wrist_2_link" link2="wrist_3_link" reason="Adjacent"/>
-    <disable_collisions link1="tcp_eff" link2="welding_eff_link" reason="Adjacent"/>
-    <disable_collisions link1="tcp_eff" link2="wrist_3_link" reason="Never"/>
-    
 </robot>

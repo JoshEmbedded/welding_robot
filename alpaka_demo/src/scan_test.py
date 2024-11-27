@@ -138,7 +138,7 @@ def calculate_pose(laser_scan, scan_index):
     r = laser_scan.ranges[scan_index]
     
     # update r to ensure end-effector doesn't move less than min sensor range (0.074)
-    r = r - 0.074
+    r = r - 0.030
     
     rospy.loginfo(f"updated range: {r}")
     # If the range is invalid (NaN or infinite), return None
@@ -218,10 +218,11 @@ def convertLaserTransform(x, y, angle):
         yaw = math.atan2(y, x)  # Angle of vector (x, y) from scanner to point
         quaternion = tf.transformations.quaternion_from_euler(0, 0, yaw)
         
-        # Add a rotation to align z-axis with x-axis
-        alignment_quaternion = tf.transformations.quaternion_from_euler(0, math.pi / 2, 0)
-        final_quaternion = tf.transformations.quaternion_multiply(alignment_quaternion, quaternion)
-
+        # # Add a rotation to align z-axis with x-axis
+        # alignment_quaternion = tf.transformations.quaternion_from_euler(0, 0, 0)
+        # final_quaternion = tf.transformations.quaternion_multiply(alignment_quaternion, quaternion)
+        final_quaternion = quaternion
+        
         laser_pose.pose.orientation.x = final_quaternion[0]
         laser_pose.pose.orientation.y = final_quaternion[1]
         laser_pose.pose.orientation.z = final_quaternion[2]
