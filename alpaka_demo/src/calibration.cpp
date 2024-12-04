@@ -1,18 +1,22 @@
 #include <ros/ros.h>
+#include <rosbag/bag.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <sensor_msgs/LaserScan.h>
+
+// Open a bag for writing
+rosbag::Bag bag;
 
 
-
-bool handlePlanError(const moveit::planning_interface::MoveItErrorCode& my_plan, 
+bool handlePlanError(const moveit::core::MoveItErrorCode& my_plan, 
                      std::string planning="planning")
 {
     ROS_INFO("Handling error code: %d", my_plan.val); // Log the error code value
     switch (my_plan.val)
     {
-    case moveit::planning_interface::MoveItErrorCode::SUCCESS:
+    case moveit::core::MoveItErrorCode::SUCCESS:
         if (planning == "planning")
         {
             ROS_INFO("Planning successful!");
@@ -22,55 +26,55 @@ bool handlePlanError(const moveit::planning_interface::MoveItErrorCode& my_plan,
             ROS_INFO("Path Executed Successfully...");
         }
         return true;
-    case moveit::planning_interface::MoveItErrorCode::PLANNING_FAILED:
+    case moveit::core::MoveItErrorCode::PLANNING_FAILED:
         ROS_ERROR("Error: Planning failed.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::INVALID_MOTION_PLAN:
+    case moveit::core::MoveItErrorCode::INVALID_MOTION_PLAN:
         ROS_ERROR("Error: Invalid motion plan.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
+    case moveit::core::MoveItErrorCode::MOTION_PLAN_INVALIDATED_BY_ENVIRONMENT_CHANGE:
         ROS_ERROR("Error: Motion plan invalidated by environment change.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::CONTROL_FAILED:
+    case moveit::core::MoveItErrorCode::CONTROL_FAILED:
         ROS_ERROR("Error: Control failed.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::UNABLE_TO_AQUIRE_SENSOR_DATA:
+    case moveit::core::MoveItErrorCode::UNABLE_TO_AQUIRE_SENSOR_DATA:
         ROS_ERROR("Error: Unable to acquire sensor data.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::TIMED_OUT:
+    case moveit::core::MoveItErrorCode::TIMED_OUT:
         ROS_ERROR("Error: Timed out.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::PREEMPTED:
+    case moveit::core::MoveItErrorCode::PREEMPTED:
         ROS_ERROR("Error: Preempted.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::START_STATE_IN_COLLISION:
+    case moveit::core::MoveItErrorCode::START_STATE_IN_COLLISION:
         ROS_ERROR("Error: Start state in collision.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::START_STATE_VIOLATES_PATH_CONSTRAINTS:
+    case moveit::core::MoveItErrorCode::START_STATE_VIOLATES_PATH_CONSTRAINTS:
         ROS_ERROR("Error: Start state violates path constraints.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::GOAL_IN_COLLISION:
+    case moveit::core::MoveItErrorCode::GOAL_IN_COLLISION:
         ROS_ERROR("Error: Goal in collision.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::GOAL_VIOLATES_PATH_CONSTRAINTS:
+    case moveit::core::MoveItErrorCode::GOAL_VIOLATES_PATH_CONSTRAINTS:
         ROS_ERROR("Error: Goal violates path constraints.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::GOAL_CONSTRAINTS_VIOLATED:
+    case moveit::core::MoveItErrorCode::GOAL_CONSTRAINTS_VIOLATED:
         ROS_ERROR("Error: Goal constraints violated.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::INVALID_GROUP_NAME:
+    case moveit::core::MoveItErrorCode::INVALID_GROUP_NAME:
         ROS_ERROR("Error: Invalid group name.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::INVALID_GOAL_CONSTRAINTS:
+    case moveit::core::MoveItErrorCode::INVALID_GOAL_CONSTRAINTS:
         ROS_ERROR("Error: Invalid goal constraints.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::INVALID_ROBOT_STATE:
+    case moveit::core::MoveItErrorCode::INVALID_ROBOT_STATE:
         ROS_ERROR("Error: Invalid robot state.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::INVALID_LINK_NAME:
+    case moveit::core::MoveItErrorCode::INVALID_LINK_NAME:
         ROS_ERROR("Error: Invalid link name.");
         break;
-    case moveit::planning_interface::MoveItErrorCode::INVALID_OBJECT_NAME:
+    case moveit::core::MoveItErrorCode::INVALID_OBJECT_NAME:
         ROS_ERROR("Error: Invalid object name.");
         break;
     default:
@@ -80,59 +84,60 @@ bool handlePlanError(const moveit::planning_interface::MoveItErrorCode& my_plan,
     return false;
 }
 
+void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
+{
+    // bag.write("laser_scan", msg->header.stamp, *msg);
+    sensor_msgs::LaserScan scan = *msg;
+}
 
-// void recordCalibration(ros::NodeHandle &nh,
-//                        moveit::planning_interface::MoveGroupInterface &move_group,
-//                        moveit::planning_interface::MoveGroupInterface::Plan &plan,
-//                        geometry_msgs::Pose pose
-//                        )
-// {
-//     // Open a bag for writing
-//     rosbag::Bag bag;
-//     bag.open("movement_data.bag", rosbag::bagmode::Write);
-//     ROS_INFO("Bag is open");
-//     move_group.setPoseTarget(pose);
-
-//     // Plan to the target pose
-//     bool planning_success = handlePlanError(move_group.plan(plan), "planning");
-
-//     if (planning_success)
-//     {
-//         // Start execution asynchronously
-//         move_group.asyncExecute(plan);
-
-//         ROS_INFO("Robot scanning...");
-
-//         // Subscribe to the laser_scan topic
-//         ros::Subscriber scan_sub = nh.subscribe<sensor_msgs::LaserScan>("/laser_scan", 10,
-//             [&](const sensor_msgs::LaserScan::ConstPtr& msg) {
-//                 // Write laser scan data with the scan timestamp
-//                 bag.write("/laser_scan", msg->header.stamp, *msg);
-
-//                 // Write TCP pose data
-//                 geometry_msgs::PoseStamped tcp_pose = move_group.getCurrentPose();
-//                 bag.write("/tcp_eff_pose", tcp_pose.header.stamp, tcp_pose);
-//             });
-
-//         // Monitor the robot's execution
-//         while (!move_group.getMoveGroupClient().waitForResult(ros::Duration(0.1)))
-//         {
-//             ros::spinOnce();
-//         }
-
-//         ROS_INFO("Movement finished.");
-//     }
-//     else
-//     {
-//         ROS_ERROR("Failed to plan movement.");
-//     }
-
-//     // Close the bag file after the movement is complete
-//     bag.close();
-
-//     ROS_INFO("Recording finished. Bag file saved.");
+void recordCalibration(ros::NodeHandle &nh,
+                       moveit::planning_interface::MoveGroupInterface &move_group,
+                       moveit::planning_interface::MoveGroupInterface::Plan &plan,
+                       geometry_msgs::Pose pose)
+{
     
-// }
+    bag.open("movement_data.bag", rosbag::bagmode::Write);
+    ROS_INFO("Bag is open");
+    move_group.setPoseTarget(pose);
+
+    // Plan to the target pose
+    bool planning_success = handlePlanError(move_group.plan(plan), "planning");
+
+    if (planning_success)
+    {
+        // Start execution asynchronously
+        
+        move_group.asyncExecute(plan);
+
+        ROS_INFO("Robot scanning...");
+
+        ros::Subscriber scan_sub = nh.subscribe("laser_scan", 10, laserScanCallback);
+       
+        // Monitor the robot's execution
+        while (!move_group.getMoveGroupClient().waitForResult(ros::Duration(0.1)))
+        {
+            ROS_INFO("In async while loop");
+            // Write TCP pose data
+
+            geometry_msgs::PoseStamped tcp_pose = move_group.getCurrentPose();
+            bag.write("tcp_eff_pose", tcp_pose.header.stamp, tcp_pose);
+        }
+
+        scan_sub.shutdown();
+        ROS_INFO("Movement finished.");
+    }
+    else
+    {
+        ROS_ERROR("Failed to plan movement.");
+    }
+
+    // Close the bag file after the movement is complete
+    bag.close();
+
+    // ROS_INFO("Recording finished. Bag file saved.");
+}
+
+
 
 
 bool computeTrajectory(moveit::planning_interface::MoveGroupInterface &move_group,
@@ -165,17 +170,17 @@ bool robotMovement(moveit::planning_interface::MoveGroupInterface &move_group,
     move_group.setPoseTarget(goal_pose);
     ROS_INFO("starting plan");
     
-    moveit::planning_interface::MoveItErrorCode planning_result = move_group.plan(plan);
+    moveit::core::MoveItErrorCode planning_result = move_group.plan(plan);
 
     // Check if planning was successful
-    if (planning_result == moveit::planning_interface::MoveItErrorCode::SUCCESS)
+    if (planning_result == moveit::core::MoveItErrorCode::SUCCESS)
     {
         ROS_INFO("Planning successful, executing...");
         
         // Execute the planned trajectory
-        moveit::planning_interface::MoveItErrorCode execution_result = move_group.execute(plan);
+        moveit::core::MoveItErrorCode execution_result = move_group.execute(plan);
         
-        if (execution_result == moveit::planning_interface::MoveItErrorCode::SUCCESS)
+        if (execution_result == moveit::core::MoveItErrorCode::SUCCESS)
         {
             ROS_INFO("Movement successful.");
             return true;
@@ -205,7 +210,7 @@ bool cartesianMovement(moveit::planning_interface::MoveGroupInterface &move_grou
     bool avoid_collisions = true;
 
     // Create a MoveItErrorCodes object
-    moveit_msgs::MoveItErrorCodes error_code;
+    moveit::core::MoveItErrorCode error_code;
 
     double fraction = move_group.computeCartesianPath(goal_poses, eef_step, jump_threshold, trajectory, avoid_collisions);
     ROS_INFO_NAMED("ur5e_laser", "Visualizing plan 4 (Cartesian path) (%.2f%% acheived)", fraction * 100.0);
@@ -288,7 +293,8 @@ geometry_msgs::Pose offsetMovement(geometry_msgs::Pose &pose, float X, float Y, 
 //     return cartesianMovement(move_group, poses, plan);
 // }
 
-bool sensorCalibration(moveit::planning_interface::MoveGroupInterface &move_group,
+bool sensorCalibration( ros::NodeHandle nh,
+                        moveit::planning_interface::MoveGroupInterface &move_group,
                        moveit::planning_interface::MoveGroupInterface::Plan &plan)
 {
     std::vector<geometry_msgs::Pose> poses;
@@ -320,7 +326,8 @@ bool sensorCalibration(moveit::planning_interface::MoveGroupInterface &move_grou
     ros::Duration(1.0).sleep(); // Wait before checking again
 
     ROS_INFO("Entered sensor calibration before record");
-    // recordCalibration(nh, move_group, plan, offset_poses);
+    offsetMovement(offset_poses, -0.16, 0, 0, 0, 0, 0, 0);
+    recordCalibration(nh, move_group, plan, offset_poses);
 
     // return cartesianMovement(move_group, poses, plan);
     return true;
@@ -344,7 +351,7 @@ int main(int argc, char **argv)
     move_group.setPoseReferenceFrame("base_link"); // Replace with the correct frame in your URDF    
     // ROS_INFO_N("manipulator", "Planning frame: %s", move_group.getPlanningFrame().c_str());
     ROS_INFO("main loop before sensorCalibration");
-    sensorCalibration(move_group, my_plan);
+    sensorCalibration(node_handle, move_group, my_plan);
     while (ros::ok())
     {
         ROS_WARN("In loop...");

@@ -10,14 +10,17 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   moveit_core
   moveit_ros_planning_interface
+  
+  rosbag
 )
 
 find_package(gazebo_ros REQUIRED)
 
+
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES alpaka_demo
-  CATKIN_DEPENDS rospy roscpp std_msgs sensor_msgs geometry_msgs moveit_core moveit_ros_planning_interface gazebo_ros
+  CATKIN_DEPENDS rospy roscpp std_msgs sensor_msgs geometry_msgs moveit_core moveit_ros_planning_interface gazebo_ros rosbag
 )
 
 ## Specify additional locations of header files
@@ -53,4 +56,4 @@ add_dependencies(calibration ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORT
 
 ## Link the library to the executable
 target_link_libraries(weld_seam_moveIt ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
-target_link_libraries(calibration ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
+target_link_libraries(calibration ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} )
