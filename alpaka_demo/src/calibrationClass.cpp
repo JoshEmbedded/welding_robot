@@ -155,6 +155,7 @@ bool LaserCalibration::sensorCalibration()
     recordCalibration(offset_pose);
     ros::Duration(1.0).sleep(); // Wait before checking again
 
+    readCalibrationData();
     return true;
     // return cartesianMovement(poses, plan);
 }
@@ -162,7 +163,6 @@ bool LaserCalibration::sensorCalibration()
 void LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
 {
     // Resolve the package path
-    std::string bag_path;
     std::string package_path = ros::package::getPath("alpaka_demo");
     if (package_path.empty())
     {
@@ -215,24 +215,66 @@ void LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
     } catch (const rosbag::BagException& e) {
         ROS_ERROR("Failed to open bag file: %s", e.what());
     }
+
+    scan_sub.shutdown();
+    joint_sub.shutdown();
 }
 
 void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
-    std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
+    
     if (bag.isOpen())
     {
+        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
         bag.write("laser_scan", msg->header.stamp, *msg);
     }
 }
 
 void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg)
 {
-    std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
+    
     if (bag.isOpen())
     {
+        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
         bag.write("joint_states", msg->header.stamp, *msg);
     }
 }
 
+void LaserCalibration::readCalibrationData()
+{
+    std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
+    bag.open(bag_path, rosbag::bagmode::Read);
+
+    std::vector<std::string> topics;
+    topics.push_back(std::string("laser_scan"));
+    topics.push_back(std::string("joint_states"));
+
+    rosbag::View view(bag, rosbag::TopicQuery(topics));
+
+    foreach(rosbag::MessageInstance const m, view)
+    {
+        // LaserScan message handling
+        sensor_msgs::LaserScan::ConstPtr s = m.instantiate<sensor_msgs::LaserScan>();
+        if (s != NULL) {
+            std::cout << "LaserScan data (ranges):" << std::endl;
+            for (size_t j = 0; j < s->ranges.size(); ++j) {
+                std::cout << s->ranges[j] << " ";  // Print each range value
+            }
+            std::cout << std::endl;
+        }
+
+        // JointState message handling
+        sensor_msgs::JointState::ConstPtr i = m.instantiate<sensor_msgs::JointState>();
+        if (i != NULL) {
+            std::cout << "JointState data:" << std::endl;
+            for (size_t j = 0; j < i->position.size(); ++j) {
+                std::cout << i->position[j] << " ";  // Print joint positions
+            }
+            std::cout << std::endl;
+        }
+    }
+    ros::Duration(1.0).sleep(); // Wait before checking again
+
+    bag.close();
+}
 
