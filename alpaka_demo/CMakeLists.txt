@@ -26,6 +26,7 @@ catkin_package(
 ## Specify additional locations of header files
 include_directories(
   include
+  include/headers
   ${catkin_INCLUDE_DIRS}
   ${GAZEBO_INCLUDE_DIRS}
   ${moveit_core_INCLUDE_DIRS}
@@ -44,6 +45,8 @@ catkin_install_python(PROGRAMS
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
+add_library(calibrationClass src/calibrationClass.cpp)
+
 ## Declare a C++ executable
 add_executable(weld_seam_moveIt src/posePlan_moveIt.cpp)
 
@@ -56,4 +59,5 @@ add_dependencies(calibration ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORT
 
 ## Link the library to the executable
 target_link_libraries(weld_seam_moveIt ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
-target_link_libraries(calibration ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} )
+target_link_libraries(calibration ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} calibrationClass)
+target_link_libraries(calibrationClass ${catkin_LIBRARIES})

@@ -11,7 +11,7 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "pose_plan");
     ros::NodeHandle node_handle;
-    ros::AsyncSpinner spinner(1);
+    ros::AsyncSpinner spinner(2);
 
     spinner.start(); 
 

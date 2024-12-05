@@ -9,6 +9,7 @@
 #include <geometry_msgs/Pose.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/LaserScan.h>
+#include <sensor_msgs/JointState.h>
 #include <mutex>
 
 
@@ -35,6 +36,7 @@ public:
     geometry_msgs::Pose offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float w, float x, float y, float z);
     bool sensorCalibration();
     void recordCalibration(geometry_msgs::Pose pose);
+    
 
 private:
     ros::NodeHandle nh;
@@ -43,7 +45,9 @@ private:
     rosbag::Bag bag;
     bool bag_open;
     void laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg);
+    void jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg);
     ros::Subscriber scan_sub;
+    ros::Subscriber joint_sub;
     std::mutex bag_mutex;  // Mutex to protect the bag file
 };
 

@@ -4,6 +4,7 @@ LaserCalibration::LaserCalibration(const std::string &group_name, ros::NodeHandl
     : move_group(group_name), nh(node_handle), bag_open(false)
 {
     scan_sub = nh.subscribe("laser_scan", 10, &LaserCalibration::laserScanCallback, this);
+    joint_sub = nh.subscribe("joint_states", 10, &LaserCalibration::jointStateCallback, this);
 }
 
 bool LaserCalibration::handlePlanError(const moveit::core::MoveItErrorCode &my_plan, const std::string planning = "planning")
@@ -218,13 +219,20 @@ void LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
 
 void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
+    std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
     if (bag.isOpen())
     {
-        // Lock mutex before writing to the bag
-        std::lock_guard<std::mutex> lock(bag_mutex);
-
         bag.write("laser_scan", msg->header.stamp, *msg);
-        geometry_msgs::PoseStamped tcp_pose = move_group.getCurrentPose();
-        bag.write("tcp_eff_pose", msg->header.stamp, tcp_pose);
     }
 }
+
+void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg)
+{
+    std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
+    if (bag.isOpen())
+    {
+        bag.write("joint_states", msg->header.stamp, *msg);
+    }
+}
+
+
