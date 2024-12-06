@@ -157,7 +157,7 @@ bool LaserCalibration::sensorCalibration()
 
     readCalibrationData();
     return true;
-    // return cartesianMovement(poses, plan);
+    return cartesianMovement(poses, plan);
 }
 
 void LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
@@ -226,7 +226,7 @@ void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr 
     if (bag.isOpen())
     {
         std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
-        bag.write("laser_scan", msg->header.stamp, *msg);
+        bag.write("laser_scan", ros::Time::now(), *msg);
     }
 }
 
@@ -236,7 +236,7 @@ void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPt
     if (bag.isOpen())
     {
         std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
-        bag.write("joint_states", msg->header.stamp, *msg);
+        bag.write("joint_states", ros::Time::now(), *msg);
     }
 }
 

@@ -16,6 +16,15 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(gazebo_ros REQUIRED)
 
+add_service_files(
+    FILES
+    ProcessBag.srv
+)
+
+generate_messages(
+    DEPENDENCIES
+    std_msgs
+)
 
 catkin_package(
   INCLUDE_DIRS include
@@ -42,6 +51,7 @@ catkin_install_python(PROGRAMS
   src/scan_pose.py
   src/scan_test.py
   src/marker_publish.py
+  src/laser_calibration.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

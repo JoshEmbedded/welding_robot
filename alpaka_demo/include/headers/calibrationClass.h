@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 #include <rosbag/bag.h>
+#include <rosbag/view.h>
 #include <ros/package.h>
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
@@ -12,6 +13,8 @@
 #include <sensor_msgs/JointState.h>
 #include <mutex>
 
+#include <boost/foreach.hpp>
+#define foreach BOOST_FOREACH
 
 
 class LaserCalibration
@@ -36,7 +39,7 @@ public:
     geometry_msgs::Pose offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float w, float x, float y, float z);
     bool sensorCalibration();
     void recordCalibration(geometry_msgs::Pose pose);
-    
+    void readCalibrationData();
 
 private:
     ros::NodeHandle nh;
@@ -49,6 +52,7 @@ private:
     ros::Subscriber scan_sub;
     ros::Subscriber joint_sub;
     std::mutex bag_mutex;  // Mutex to protect the bag file
+    std::string bag_path;
 };
 
 #endif // LASER_CALIBRATION_H

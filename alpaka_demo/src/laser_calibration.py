@@ -1,0 +1,142 @@
+# test_example.py
+import rospy
+import rosbag
+from sensor_msgs.msg import LaserScan
+from alpaka_demo.srv import ProcessBag, ProcessBagResponse
+import numpy as np
+
+
+def interpolate_nan_with_tolerance(data, tolerance):
+    """
+    Interpolates NaN values in a 1D array based on surrounding valid values within a certain tolerance.
+
+    Parameters:
+        data (np.ndarray): The input 1D array containing `NaN` values.
+        tolerance (float): The maximum allowed gap (in indices) for interpolation to occur.
+
+    Returns:
+        np.ndarray: A new array with interpolated values for `NaN` elements within the tolerance range.
+    """
+    # Create a copy to avoid modifying the original data
+    data_interpolated = np.copy(data)
+
+    # Find indices of NaN values
+    nan_indices = np.where(np.isnan(data))[0]
+
+    for nan_idx in nan_indices:
+        # Look for valid values before and after the current NaN index
+        valid_before = None
+        valid_after = None
+
+        # Search backward for the nearest valid value
+        for i in range(nan_idx - 1, -1, -1):
+            if not np.isnan(data[i]):
+                valid_before = (i, data[i])
+                break
+
+        # Search forward for the nearest valid value
+        for i in range(nan_idx + 1, len(data)):
+            if not np.isnan(data[i]):
+                valid_after = (i, data[i])
+                break
+
+        # Interpolate only if both valid_before and valid_after are within the tolerance range
+        if valid_before and valid_after:
+            gap_before = nan_idx - valid_before[0]
+            gap_after = valid_after[0] - nan_idx
+
+            if gap_before <= tolerance and gap_after <= tolerance:
+                # Linear interpolation
+                value = (valid_before[1] * gap_after + valid_after[1] * gap_before) / (gap_before + gap_after)
+                data_interpolated[nan_idx] = value
+
+    return data_interpolated
+
+def convertData(laser_scan):
+    # Extract the range data (assuming the ranges are in the 'ranges' field of LaserScan message)
+    
+    range_data = np.array(laser_scan.ranges)
+    
+    range_data[range_data == float('inf')] = np.nan  # Replace 'inf' with NaN
+    
+    range_data = interpolate_nan_with_tolerance(range_data, 3)
+    
+    converted_data = []
+    for i in range(len(range_data)):
+        converted_data.append((range_data[i],i,laser_scan.header.stamp))
+    
+    # Convert the list to a NumPy array (if needed)
+    converted_data_array = np.array(converted_data)
+    return converted_data_array
+
+def find_seam(data):
+    
+    range_data = [item[0] for item in data]
+    
+    edge = False
+    index = -1
+    for i in range(1, len(range_data) - 1):  # Avoid the first and last elements
+        # Skip if the current or neighboring values are NaN
+        if np.isnan(range_data[i-1]) or np.isnan(range_data[i]) or np.isnan(range_data[i+1]):
+            continue  # Skip this iteration
+        
+        if range_data[i-1] < range_data[i] > range_data[i+1]:  # Local maxima
+            # local_maxima.append(i)
+            # rospy.loginfo(f"local maxima found at indices: {i}, with range: {range_data[i]}.")
+            index = i
+            edge = True
+        # elif range_data[i-1] > range_data[i] < range_data[i+1]:  # Local minima
+        #     local_minima.append(i)
+        #     # rospy.loginfo(f"local minima found at indices: {i}, with range: {range_data[i]}.")
+        #     index = i
+        #     edge = True
+    
+    if edge:
+        return data[index]
+        
+    else:
+        rospy.logerr("Change in direction failed.")
+        
+def find_seam_from_bag(bag_path):
+    
+    try:
+        # Open the rosbag
+        
+        bag = rosbag.Bag(bag_path)
+        rospy.loginfo(f"Opened rosbag: {bag_path}")
+
+        direction_change = []
+        # Process LaserScan messages
+        for topic, msg, t in bag.read_messages(topics=['laser_scan']):
+            converted_data = convertData(msg)
+            if find_seam(converted_data) is None:
+                continue
+            else:
+                direction_change.append(find_seam(converted_data));
+
+        vulcram_centre = find_seam(direction_change)
+        bag.close()
+        return vulcram_centre;
+    except Exception as e:
+        rospy.logerr(f"Error processing rosbag: {e}")
+        return f"Error: {str(e)}"
+        
+def handle_process_bag(req):
+    rospy.loginfo(f"Received request to process rosbag: {req.bag_path}")
+    result = find_seam_from_bag(req.bag_path)
+    
+    if result is None:
+        rospy.logerr("Failed to process rosbag properly.")
+        return ProcessBagResponse(some_float=0.0, some_int=0, timestamp=rospy.Time(0))
+    
+    range, index, timestamp = result[0], result[1], result[2]
+    return ProcessBagResponse(some_float=range, some_int=index, timestamp=timestamp)
+
+def process_bag_server():
+    rospy.init_node('process_bag_service')
+    service = rospy.Service('process_bag', ProcessBag, handle_process_bag)
+    rospy.loginfo("Ready to process rosbag files.")
+    rospy.spin()
+
+if __name__ == '__main__':
+    process_bag_server()
