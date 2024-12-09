@@ -4,6 +4,7 @@ import rosbag
 from sensor_msgs.msg import LaserScan
 from alpaka_demo.srv import ProcessBag, ProcessBagResponse
 import numpy as np
+from rospy import Time
 
 
 def interpolate_nan_with_tolerance(data, tolerance):
@@ -120,17 +121,46 @@ def find_seam_from_bag(bag_path):
     except Exception as e:
         rospy.logerr(f"Error processing rosbag: {e}")
         return f"Error: {str(e)}"
+    
+def find_approx_joint_state(bag_path, timestamp):
+    
+    # Initialize variables
+    closest_joint_state = None
+    smallest_time_diff = float('inf')
+
+    try:
+        # Open the rosbag
+        bag = rosbag.Bag(bag_path)
+        rospy.loginfo(f"Opened rosbag: {bag_path}")
+        # Process LaserScan messages
+        for topic, msg, t in bag.read_messages(topics=['joint_states']):
+            time_diff = abs((t-timestamp).to_sec())
+            
+            # Check if this is the closest message so far
+            if time_diff < smallest_time_diff:
+                closest_joint_state = msg
+                smallest_time_diff = time_diff
+        
+        print(closest_joint_state)
+                
+    except Exception as e:
+        rospy.logerr(f"Error processing rosbag: {e}")
+        return f"Error: {str(e)}"
+    
+    return closest_joint_state
+            
         
 def handle_process_bag(req):
     rospy.loginfo(f"Received request to process rosbag: {req.bag_path}")
     result = find_seam_from_bag(req.bag_path)
+    scan_time_stamp = result[2]
+    scan_joint_state = find_approx_joint_state(req.bag_path, scan_time_stamp)
     
-    if result is None:
+    if scan_joint_state is None:
         rospy.logerr("Failed to process rosbag properly.")
-        return ProcessBagResponse(some_float=0.0, some_int=0, timestamp=rospy.Time(0))
+        return ProcessBagResponse(joint_state = None)
     
-    range, index, timestamp = result[0], result[1], result[2]
-    return ProcessBagResponse(some_float=range, some_int=index, timestamp=timestamp)
+    return ProcessBagResponse(joint_state = scan_joint_state)
 
 def process_bag_server():
     rospy.init_node('process_bag_service')
@@ -139,4 +169,4 @@ def process_bag_server():
     rospy.spin()
 
 if __name__ == '__main__':
-    process_bag_server()
+    process_bag_server()    

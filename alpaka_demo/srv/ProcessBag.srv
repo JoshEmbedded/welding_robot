@@ -1,6 +1,4 @@
 string bag_path
 ---
 # Response (output) part
-float32 some_float
-int32 some_int
-time timestamp
+sensor_msgs/JointState joint_state
