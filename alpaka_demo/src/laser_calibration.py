@@ -158,12 +158,12 @@ def handle_process_bag(req):
     
     if scan_joint_state is None:
         rospy.logerr("Failed to process rosbag properly.")
-        return ProcessBagResponse(joint_state = None)
+        return ProcessBagResponse(joint_state = None, analysed = False)
     
-    return ProcessBagResponse(joint_state = scan_joint_state)
+    return ProcessBagResponse(joint_state = scan_joint_state, analysed = True)
 
 def process_bag_server():
-    rospy.init_node('process_bag_service')
+    rospy.init_node('bag_calibration_service')
     service = rospy.Service('process_bag', ProcessBag, handle_process_bag)
     rospy.loginfo("Ready to process rosbag files.")
     rospy.spin()

@@ -98,6 +98,20 @@ bool LaserCalibration::robotMovement(const geometry_msgs::Pose &goal_pose)
     return false;
 }
 
+bool LaserCalibration::jointMovement(const sensor_msgs::JointState joints)
+{
+    move_group.setJointValueTarget(joints);
+
+    if (handlePlanError(move_group.plan(plan), "planning"))
+    {
+        if (handlePlanError(move_group.execute(plan), "execution"))
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool LaserCalibration::cartesianMovement(std::vector<geometry_msgs::Pose> &goal_poses, moveit::planning_interface::MoveGroupInterface::Plan &plan)
 {
     moveit_msgs::RobotTrajectory trajectory;
@@ -132,8 +146,13 @@ bool LaserCalibration::sensorCalibration()
     start_pose.orientation.z = 0;
     start_pose.orientation.w = 0;
 
-    robotMovement(start_pose);
-    ROS_INFO("First Movement Completed.");
+    if(robotMovement(start_pose)){
+        ROS_INFO("First Movement Completed.");
+    }
+    else{
+        return false;
+    }
+    
     geometry_msgs::Pose offset_pose = start_pose;
     // lower eff into vulcram
     offsetMovement(offset_pose, 0, 0, -0.025, 0, 0, 0, 0);
@@ -152,15 +171,26 @@ bool LaserCalibration::sensorCalibration()
 
     // ROS_INFO("Entered sensor calibration before record");
     offsetMovement(offset_pose, -0.16, 0, 0, 0, 0, 0, 0);
-    recordCalibration(offset_pose);
+    bool record = recordCalibration(offset_pose);
     ros::Duration(1.0).sleep(); // Wait before checking again
 
-    readCalibrationData();
+    if (record)
+    {
+        if (processScan())
+        {
+            ROS_INFO("Moving robot to target Joint States");
+            jointMovement(calculated_joints);
+        }
+        else{
+            ROS_ERROR("Unable to obtain joint targets from service");
+            return false;        
+            }
+    }
+
     return true;
-    return cartesianMovement(poses, plan);
 }
 
-void LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
+bool LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
 {
     // Resolve the package path
     std::string package_path = ros::package::getPath("alpaka_demo");
@@ -180,21 +210,10 @@ void LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
     ros::Duration(0.5).sleep(); // Wait before checking again
     geometry_msgs::PoseStamped tcp_pose = move_group.getCurrentPose();
 
-    // Print position
-    ROS_INFO("Position: x = %.3f, y = %.3f, z = %.3f", 
-            tcp_pose.pose.position.x, 
-            tcp_pose.pose.position.y, 
-            tcp_pose.pose.position.z);
-
-    // Print orientation (quaternion)
-    ROS_INFO("Orientation: x = %.3f, y = %.3f, z = %.3f, w = %.3f", 
-            tcp_pose.pose.orientation.x, 
-            tcp_pose.pose.orientation.y, 
-            tcp_pose.pose.orientation.z, 
-            tcp_pose.pose.orientation.w);
     move_group.startStateMonitor(); // initalise for faster state request.
     move_group.setPoseTarget(pose);
     bool plan_success = handlePlanError(move_group.plan(plan));
+    bool record;
     try
     {
         bag.open(bag_path, rosbag::bagmode::Write);
@@ -212,12 +231,14 @@ void LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
         std::lock_guard<std::mutex> lock(bag_mutex);
         bag.close();
         ROS_INFO("Bag Closed");
+        record = true;
     } catch (const rosbag::BagException& e) {
         ROS_ERROR("Failed to open bag file: %s", e.what());
+        record = false;
     }
-
     scan_sub.shutdown();
     joint_sub.shutdown();
+    return record;
 }
 
 void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
@@ -239,6 +260,45 @@ void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPt
         bag.write("joint_states", ros::Time::now(), *msg);
     }
 }
+
+bool LaserCalibration::processScan()
+{
+    ros::ServiceClient client = nh.serviceClient<alpaka_demo::ProcessBag>("process_bag");
+
+    // Wait for the service to be available
+    ROS_INFO("Waiting for the service to be available...");
+    client.waitForExistence();
+    ROS_INFO("Service available!");
+
+    alpaka_demo::ProcessBag srv;
+        
+    srv.request.bag_path = bag_path;
+
+    // Call the service
+    if (client.call(srv))
+    {
+        ROS_INFO("Received joint state:");
+        if (srv.response.analysed)
+        {
+            for (size_t i = 0; i < srv.response.joint_state.name.size(); ++i)
+            {
+                ROS_INFO("  Joint: %s, Position: %f", srv.response.joint_state.name[i].c_str(),
+                srv.response.joint_state.position[i]);
+            }
+            calculated_joints = srv.response.joint_state;
+        }
+        return srv.response.analysed;
+    }
+    else
+    {
+        ROS_ERROR("Failed to call service /get_joint_state");
+        return false;
+    }
+}
+
+    
+
+
 
 void LaserCalibration::readCalibrationData()
 {

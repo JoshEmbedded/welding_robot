@@ -2,3 +2,4 @@ string bag_path
 ---
 # Response (output) part
 sensor_msgs/JointState joint_state
+bool analysed

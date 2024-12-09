@@ -7,6 +7,7 @@
 #include <sensor_msgs/LaserScan.h>
 #include "headers/calibrationClass.h"
 
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "pose_plan");
@@ -20,7 +21,7 @@ int main(int argc, char **argv)
     LaserCalibration Calibration(PLANNING_GROUP, node_handle);
 
     bool success = Calibration.sensorCalibration();
-    
+
     if (success)
     {
         ROS_INFO("Calibration Movement Successful");

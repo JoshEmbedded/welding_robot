@@ -11,6 +11,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/JointState.h>
+#include <alpaka_demo/ProcessBag.h>
 #include <mutex>
 
 #include <boost/foreach.hpp>
@@ -35,11 +36,14 @@ public:
     bool handlePlanError(const moveit::core::MoveItErrorCode& my_plan, const std::string planning);
     bool computeTrajectory(const geometry_msgs::PoseStamped &goal_pose, moveit::planning_interface::MoveGroupInterface::Plan &plan);
     bool robotMovement(const geometry_msgs::Pose &goal_pose);
+    bool jointMovement(const sensor_msgs::JointState joints);
     bool cartesianMovement(std::vector<geometry_msgs::Pose> &goal_poses, moveit::planning_interface::MoveGroupInterface::Plan &plan);
     geometry_msgs::Pose offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float w, float x, float y, float z);
     bool sensorCalibration();
-    void recordCalibration(geometry_msgs::Pose pose);
+    bool recordCalibration(geometry_msgs::Pose pose);
     void readCalibrationData();
+    bool processScan();
+    std::string bag_path;
 
 private:
     ros::NodeHandle nh;
@@ -52,7 +56,8 @@ private:
     ros::Subscriber scan_sub;
     ros::Subscriber joint_sub;
     std::mutex bag_mutex;  // Mutex to protect the bag file
-    std::string bag_path;
+    sensor_msgs::JointState calculated_joints;
+    
 };
 
 #endif // LASER_CALIBRATION_H
