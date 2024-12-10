@@ -22,9 +22,12 @@ int main(int argc, char **argv)
 
     bool success = Calibration.sensorCalibration();
 
+    geometry_msgs::Pose sensor_transform;
     if (success)
     {
-        ROS_INFO("Calibration Movement Successful");
+        ROS_INFO("Calibration Successful");\
+        sensor_transform = Calibration.getSensorTransform();
+
     }
 
     else{

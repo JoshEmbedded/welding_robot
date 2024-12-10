@@ -8,10 +8,13 @@
 #include <moveit/move_group_interface/move_group_interface.h>
 #include <moveit/planning_scene_interface/planning_scene_interface.h>
 #include <geometry_msgs/Pose.h>
+#include <geometry_msgs/Point.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <sensor_msgs/LaserScan.h>
 #include <sensor_msgs/JointState.h>
 #include <alpaka_demo/ProcessBag.h>
+#include <geometry_msgs/Quaternion.h>
+#include <tf2/LinearMath/Quaternion.h>
 #include <mutex>
 
 #include <boost/foreach.hpp>
@@ -43,6 +46,8 @@ public:
     bool recordCalibration(geometry_msgs::Pose pose);
     void readCalibrationData();
     bool processScan();
+    geometry_msgs::Pose calculateTransform();
+    geometry_msgs::Pose getSensorTransform();
     std::string bag_path;
 
 private:
@@ -57,7 +62,11 @@ private:
     ros::Subscriber joint_sub;
     std::mutex bag_mutex;  // Mutex to protect the bag file
     sensor_msgs::JointState calculated_joints;
-    
+    float sensor_tilt;
+    geometry_msgs::Point service_offset;
+    geometry_msgs::Pose sensor_transform;
+    geometry_msgs::Pose tcp_transform;
+    geometry_msgs::Point vulcram_point;
 };
 
 #endif // LASER_CALIBRATION_H

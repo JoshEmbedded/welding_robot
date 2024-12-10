@@ -1,10 +1,11 @@
-# test_example.py
+#!/usr/bin/env python3
 import rospy
 import rosbag
 from sensor_msgs.msg import LaserScan
 from alpaka_demo.srv import ProcessBag, ProcessBagResponse
 import numpy as np
 from rospy import Time
+import math
 
 
 def interpolate_nan_with_tolerance(data, tolerance):
@@ -99,7 +100,6 @@ def find_seam(data):
         rospy.logerr("Change in direction failed.")
         
 def find_seam_from_bag(bag_path):
-    
     try:
         # Open the rosbag
         
@@ -114,7 +114,7 @@ def find_seam_from_bag(bag_path):
                 continue
             else:
                 direction_change.append(find_seam(converted_data));
-
+        
         vulcram_centre = find_seam(direction_change)
         bag.close()
         return vulcram_centre;
@@ -140,27 +140,70 @@ def find_approx_joint_state(bag_path, timestamp):
             if time_diff < smallest_time_diff:
                 closest_joint_state = msg
                 smallest_time_diff = time_diff
-        
-        print(closest_joint_state)
                 
     except Exception as e:
         rospy.logerr(f"Error processing rosbag: {e}")
         return f"Error: {str(e)}"
     
     return closest_joint_state
-            
+
+def calculate_pose(centre_point=None, angle_min=None, angle_increment=None):
+    
+    r = centre_point[0]
+    scan_index = centre_point[1]
+    angle = angle_min + scan_index * angle_increment
+    
+        
+    # If the range is invalid (NaN or infinite), return None
+    if r == float('Inf') or r == float('NaN'):
+        rospy.logwarn(f"Invalid range value at index {scan_index}.")
+        return None
+    
+    # Convert the polar coordinates (r, angle) to Cartesian coordinates (x, y), calculated: θ=angle_min+scan_index×angle_increment
+    x = r * math.cos(angle)
+    y = r * math.sin(angle)
+    
+    rospy.loginfo("calculated x position from laser data: %f ", x)
+    rospy.loginfo("calculated y position from laser data: %f ", y)
+    rospy.loginfo("calculated angle from laser data: %f ", angle)
+    
+    return x,y,angle
+
+def get_pose(bag_path, centre_point):
+    
+    angle_min = None
+    angle_increment = None
+    
+    try:
+        # Open the rosbag
+        bag = rosbag.Bag(bag_path)
+        rospy.loginfo(f"Opened rosbag: {bag_path}")
+        # Process LaserScan messages
+        for topic, msg, t in bag.read_messages(topics=['laser_scan']):
+            angle_min = msg.angle_min
+            angle_increment = msg.angle_increment    
+            break
+        
+        return calculate_pose(centre_point=centre_point, angle_min=angle_min, angle_increment=angle_increment)
+           
+    except Exception as e:
+        rospy.logerr(f"Error processing rosbag: {e}")
+        return f"Error: {str(e)}"
         
 def handle_process_bag(req):
     rospy.loginfo(f"Received request to process rosbag: {req.bag_path}")
-    result = find_seam_from_bag(req.bag_path)
-    scan_time_stamp = result[2]
+    vulcram_centre_scan = find_seam_from_bag(req.bag_path)
+    
+    x,y,angle = get_pose(req.bag_path, vulcram_centre_scan)
+    
+    scan_time_stamp = vulcram_centre_scan[2]
     scan_joint_state = find_approx_joint_state(req.bag_path, scan_time_stamp)
     
     if scan_joint_state is None:
         rospy.logerr("Failed to process rosbag properly.")
-        return ProcessBagResponse(joint_state = None, analysed = False)
+        return ProcessBagResponse(joint_state = None, analysed = False, x=None, y=None, angle=None)
     
-    return ProcessBagResponse(joint_state = scan_joint_state, analysed = True)
+    return ProcessBagResponse(joint_state = scan_joint_state, analysed = True, x=x, y=y, angle=angle)
 
 def process_bag_server():
     rospy.init_node('bag_calibration_service')

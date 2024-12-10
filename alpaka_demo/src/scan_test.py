@@ -1,4 +1,4 @@
-# test_example.py
+#!/usr/bin/env python3
 import rospy
 from collections import deque
 import tf
@@ -122,32 +122,41 @@ def find_seam(laser_scan):
     
     if edge:
         rospy.loginfo("Change in direction detected:")
-        calculate_pose(laser_scan, index)
+        calculate_pose(laser_scan=laser_scan, scan_index=index)
         
     else:
         rospy.logerr("Change in direction failed. ROS Shutdown...")    
         
     
-def calculate_pose(laser_scan, scan_index):
+def calculate_pose(laser_scan, scan_index, centre_point=None, angle_min=None, angle_increment=None):
     
     if scan_index < 0 or scan_index >= len(laser_scan.ranges):
         rospy.logwarn(f"Invalid scan index {scan_index}. Must be between 0 and {len(laser_scan.ranges)-1}.")
         return None
     
-    # Get the range (distance) at the given index
-    r = laser_scan.ranges[scan_index]
-    if r - 0.02 < 0.074:
-        r = 0.074
+    if centre_point is None:
+        
+        # Get the range (distance) at the given index
+        r = laser_scan.ranges[scan_index]
+
+        if r - 0.02 < 0.074:
+            r = 0.074
+        else:
+            r = r - 0.02 #remove small distance to keep a gap for welding
+        
+        # Calculate the angle corresponding to the chosen scan index
+        angle = laser_scan.angle_min + scan_index * laser_scan.angle_increment
+        
     else:
-        r = r - 0.02 #remove small distance to keep a gap for welding
+        r = centre_point[0]
+        scan_index = centre_point[1]
+        angle = angle_min + scan_index * angle_increment
     
+        
     # If the range is invalid (NaN or infinite), return None
     if r == float('Inf') or r == float('NaN'):
         rospy.logwarn(f"Invalid range value at index {scan_index}.")
         return None
-    
-    # Calculate the angle corresponding to the chosen scan index
-    angle = laser_scan.angle_min + scan_index * laser_scan.angle_increment
     
     # Convert the polar coordinates (r, angle) to Cartesian coordinates (x, y), calculated: θ=angle_min+scan_index×angle_increment
     x = r * math.cos(angle)

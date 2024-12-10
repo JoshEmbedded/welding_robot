@@ -3,3 +3,6 @@ string bag_path
 # Response (output) part
 sensor_msgs/JointState joint_state
 bool analysed
+float64 x
+float64 y
+float64 angle

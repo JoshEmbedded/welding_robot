@@ -53,6 +53,7 @@ catkin_install_python(PROGRAMS
   src/scan_test.py
   src/marker_publish.py
   src/laser_calibration.py
+  src/transformCalculation.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

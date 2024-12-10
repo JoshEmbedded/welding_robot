@@ -1,7 +1,7 @@
 #include "headers/calibrationClass.h"
 
 LaserCalibration::LaserCalibration(const std::string &group_name, ros::NodeHandle node_handle)
-    : move_group(group_name), nh(node_handle), bag_open(false)
+    : move_group(group_name), nh(node_handle), bag_open(false), sensor_tilt(-1.8579793)
 {
     scan_sub = nh.subscribe("laser_scan", 10, &LaserCalibration::laserScanCallback, this);
     joint_sub = nh.subscribe("joint_states", 10, &LaserCalibration::jointStateCallback, this);
@@ -170,7 +170,7 @@ bool LaserCalibration::sensorCalibration()
     ros::Duration(1.0).sleep(); // Wait before checking again
 
     // ROS_INFO("Entered sensor calibration before record");
-    offsetMovement(offset_pose, -0.16, 0, 0, 0, 0, 0, 0);
+    offsetMovement(offset_pose, -0.18, 0, 0, 0, 0, 0, 0);
     bool record = recordCalibration(offset_pose);
     ros::Duration(1.0).sleep(); // Wait before checking again
 
@@ -180,11 +180,13 @@ bool LaserCalibration::sensorCalibration()
         {
             ROS_INFO("Moving robot to target Joint States");
             jointMovement(calculated_joints);
-        }
+            sensor_transform = calculateTransform();
+            return true;
+        }    
         else{
             ROS_ERROR("Unable to obtain joint targets from service");
             return false;        
-            }
+        }
     }
 
     return true;
@@ -241,25 +243,7 @@ bool LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
     return record;
 }
 
-void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
-{
-    
-    if (bag.isOpen())
-    {
-        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
-        bag.write("laser_scan", ros::Time::now(), *msg);
-    }
-}
 
-void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg)
-{
-    
-    if (bag.isOpen())
-    {
-        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
-        bag.write("joint_states", ros::Time::now(), *msg);
-    }
-}
 
 bool LaserCalibration::processScan()
 {
@@ -286,6 +270,8 @@ bool LaserCalibration::processScan()
                 srv.response.joint_state.position[i]);
             }
             calculated_joints = srv.response.joint_state;
+            service_offset.y = srv.response.y;
+            service_offset.z = srv.response.x;
         }
         return srv.response.analysed;
     }
@@ -296,7 +282,97 @@ bool LaserCalibration::processScan()
     }
 }
 
+geometry_msgs::Pose LaserCalibration::calculateTransform()
+{
+
+    /// FIND THE TRANSFORM FROM THE TCP
+
+    tcp_transform = move_group.getCurrentPose().pose;
+
+    // ROS_INFO("TCP Transform:");
+    // ROS_INFO("  Position:");
+    // ROS_INFO("    x: %.3f", tcp_transform.position.x);
+    // ROS_INFO("    y: %.3f", tcp_transform.position.y);
+    // ROS_INFO("    z: %.3f", tcp_transform.position.z);
+
+    // ROS_INFO("  Orientation:");
+    // ROS_INFO("    x: %.3f", tcp_transform.orientation.x);
+    // ROS_INFO("    y: %.3f", tcp_transform.orientation.y);
+    // ROS_INFO("    z: %.3f", tcp_transform.orientation.z);
+    // ROS_INFO("    w: %.3f", tcp_transform.orientation.w);
+
+    sensor_transform.position.x = -tcp_transform.position.x; //finding the transform between sensor & TCP
+    sensor_transform.position.y = service_offset.y;
+    sensor_transform.position.z = tcp_transform.position.z - service_offset.z;
+    sensor_transform.orientation.x = 0;
+    sensor_transform.orientation.y = 0;
+    sensor_transform.orientation.z = 0;
+    sensor_transform.orientation.w = 1;
     
+
+    // Create a tf2 quaternion from the sensor orientation
+    tf2::Quaternion sensor_orientation_quat(
+        sensor_transform.orientation.x,
+        sensor_transform.orientation.y,
+        sensor_transform.orientation.z,
+        sensor_transform.orientation.w
+    );
+
+    // Create a rotation quaternion for -1.8579793 radians around the y-axis
+    tf2::Quaternion rotation_quat;
+    rotation_quat.setRPY(0, sensor_tilt, 0); // Roll = 0, Pitch (y-axis) = -1.8579793, Yaw = 0
+
+    // Combine the quaternions
+    tf2::Quaternion updated_orientation = sensor_orientation_quat * rotation_quat;
+
+    // Normalize the quaternion to ensure it's valid
+    updated_orientation.normalize();
+
+    // Update the orientation in sensor_transform
+    sensor_transform.orientation.x = updated_orientation.x();
+    sensor_transform.orientation.y = updated_orientation.y();
+    sensor_transform.orientation.z = updated_orientation.z();
+    sensor_transform.orientation.w = updated_orientation.w();
+
+    ROS_INFO("Laser Scanner Offset Transform:");
+    ROS_INFO("  Position:");
+    ROS_INFO("    x: %.3f", sensor_transform.position.x);
+    ROS_INFO("    y: %.3f", sensor_transform.position.y);
+    ROS_INFO("    z: %.3f", sensor_transform.position.z);
+
+    ROS_INFO("  Orientation:");
+    ROS_INFO("    x: %.3f", sensor_transform.orientation.x);
+    ROS_INFO("    y: %.3f", sensor_transform.orientation.y);
+    ROS_INFO("    z: %.3f", sensor_transform.orientation.z);
+    ROS_INFO("    w: %.3f", sensor_transform.orientation.w);
+
+    // Return Transform between sensor & TCP
+    return sensor_transform;   
+}
+geometry_msgs::Pose LaserCalibration::getSensorTransform()
+{
+    return sensor_transform;
+}
+
+void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
+{
+    
+    if (bag.isOpen())
+    {
+        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
+        bag.write("laser_scan", ros::Time::now(), *msg);
+    }
+}
+
+void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg)
+{
+    
+    if (bag.isOpen())
+    {
+        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
+        bag.write("joint_states", ros::Time::now(), *msg);
+    }
+}  
 
 
 
