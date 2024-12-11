@@ -96,9 +96,6 @@ def find_seam(data):
     if edge:
         return data[index]
         
-    else:
-        rospy.logerr("Change in direction failed.")
-        
 def find_seam_from_bag(bag_path):
     try:
         # Open the rosbag
@@ -140,7 +137,7 @@ def find_approx_joint_state(bag_path, timestamp):
             if time_diff < smallest_time_diff:
                 closest_joint_state = msg
                 smallest_time_diff = time_diff
-                
+        bag.close()        
     except Exception as e:
         rospy.logerr(f"Error processing rosbag: {e}")
         return f"Error: {str(e)}"
@@ -183,7 +180,7 @@ def get_pose(bag_path, centre_point):
             angle_min = msg.angle_min
             angle_increment = msg.angle_increment    
             break
-        
+        bag.close()
         return calculate_pose(centre_point=centre_point, angle_min=angle_min, angle_increment=angle_increment)
            
     except Exception as e:

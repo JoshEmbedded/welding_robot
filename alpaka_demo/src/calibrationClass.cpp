@@ -121,15 +121,36 @@ bool LaserCalibration::cartesianMovement(std::vector<geometry_msgs::Pose> &goal_
     return fraction > 0.8 && handlePlanError(move_group.plan(plan), "planning") && handlePlanError(move_group.execute(plan), "execution");
 }
 
-geometry_msgs::Pose LaserCalibration::offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float w, float x, float y, float z)
+geometry_msgs::Pose LaserCalibration::offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float roll_offset, float pitch_offset, float yaw_offset)
 {
     pose.position.x += X;
     pose.position.y += Y;
     pose.position.z += Z;
-    pose.orientation.w += w;
-    pose.orientation.x += x;
-    pose.orientation.y += y;
-    pose.orientation.z += z;
+    // Extract current RPY angles from the quaternion
+    tf2::Quaternion q(
+        pose.orientation.x,
+        pose.orientation.y,
+        pose.orientation.z,
+        pose.orientation.w
+    );
+    double roll, pitch, yaw;
+    tf2::Matrix3x3(q).getRPY(roll, pitch, yaw);
+
+    // Apply offsets to RPY angles
+    roll += roll_offset;
+    pitch += pitch_offset;
+    yaw += yaw_offset;
+
+    // Convert updated RPY angles back to quaternion
+    tf2::Quaternion updated_q;
+    updated_q.setRPY(roll, pitch, yaw);
+
+    // Update the pose's orientation with the new quaternion
+    pose.orientation.x = updated_q.x();
+    pose.orientation.y = updated_q.y();
+    pose.orientation.z = updated_q.z();
+    pose.orientation.w = updated_q.w();
+
     return pose;
 }
 
@@ -146,6 +167,8 @@ bool LaserCalibration::sensorCalibration()
     start_pose.orientation.z = 0;
     start_pose.orientation.w = 0;
 
+    //Test rotation calibration also works.
+    // offsetMovement(start_pose, 0, 0, 0, 0, 0, 0.3);
     if(robotMovement(start_pose)){
         ROS_INFO("First Movement Completed.");
     }
@@ -155,45 +178,71 @@ bool LaserCalibration::sensorCalibration()
     
     geometry_msgs::Pose offset_pose = start_pose;
     // lower eff into vulcram
-    offsetMovement(offset_pose, 0, 0, -0.025, 0, 0, 0, 0);
+    offsetMovement(offset_pose, 0, 0, -0.025, 0, 0, 0);
     robotMovement(offset_pose);
     ros::Duration(1.0).sleep(); // Wait before checking again
 
     // //lift eff from vulcram.
-    offsetMovement(offset_pose, 0, 0, 0.025, 0, 0, 0, 0);
+    offsetMovement(offset_pose, 0, 0, 0.025, 0, 0, 0);
     robotMovement(offset_pose);
     ros::Duration(1.0).sleep(); // Wait before checking again
 
     // //move in y direction
-    offsetMovement(offset_pose, 0.08, 0, 0, 0, 0, 0, 0);
+    offsetMovement(offset_pose, 0.08, 0, 0, 0, 0, 0);
     robotMovement(offset_pose);
     ros::Duration(1.0).sleep(); // Wait before checking again
 
     // ROS_INFO("Entered sensor calibration before record");
-    offsetMovement(offset_pose, -0.18, 0, 0, 0, 0, 0, 0);
+    offsetMovement(offset_pose, -0.18, 0, 0, 0, 0, 0);
     bool record = recordCalibration(offset_pose);
     ros::Duration(1.0).sleep(); // Wait before checking again
 
-    if (record)
+    if (!record)
     {
-        if (processScan())
-        {
-            ROS_INFO("Moving robot to target Joint States");
-            jointMovement(calculated_joints);
-            sensor_transform = calculateTransform();
-            return true;
-        }    
-        else{
-            ROS_ERROR("Unable to obtain joint targets from service");
-            return false;        
-        }
+        ROS_ERROR("Robot Scan Failed.");
+        return false;
     }
+
+    if (!processScan())
+    {
+            ROS_ERROR("Unable to calibrate from first pass.");
+            ROS_INFO("Scan pass along y-axis");
+            robotMovement(start_pose);
+            ros::Duration(1.0).sleep(); // Wait before checking again
+
+            offset_pose = start_pose;
+            offsetMovement(offset_pose, 0, 0.08, 0, 0, 0, 0);
+            robotMovement(offset_pose);
+            ros::Duration(1.0).sleep(); // Wait before checking again
+
+            // ROS_INFO("Entered sensor calibration before record");
+            offsetMovement(offset_pose, 0, -0.18, 0, 0, 0, 0);
+            record = recordCalibration(offset_pose);
+            ros::Duration(1.0).sleep(); // Wait before checking again
+    }    
+    
+    if (!record)
+    {
+        ROS_ERROR("Robot Scan Failed.");
+        return false;
+    }
+    if (!processScan())
+    {
+        ROS_ERROR("Analysing Bag Failed.");
+        return false;
+    }
+
+    ROS_INFO("Moving robot to target Joint States");
+    jointMovement(calculated_joints);
+
+    sensor_transform = calculateTransform();
 
     return true;
 }
 
 bool LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
 {
+
     // Resolve the package path
     std::string package_path = ros::package::getPath("alpaka_demo");
     if (package_path.empty())
@@ -230,7 +279,7 @@ bool LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
         {
             ROS_ERROR("Calibration scan failed.");
         }
-        std::lock_guard<std::mutex> lock(bag_mutex);
+        std::lock_guard<std::mutex> lock(bag_mutex); 
         bag.close();
         ROS_INFO("Bag Closed");
         record = true;
@@ -238,8 +287,11 @@ bool LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
         ROS_ERROR("Failed to open bag file: %s", e.what());
         record = false;
     }
+
     scan_sub.shutdown();
     joint_sub.shutdown();
+    ros::Duration(0.05).sleep();
+
     return record;
 }
 
@@ -356,7 +408,6 @@ geometry_msgs::Pose LaserCalibration::getSensorTransform()
 
 void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
-    
     if (bag.isOpen())
     {
         std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
@@ -366,7 +417,6 @@ void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr 
 
 void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPtr &msg)
 {
-    
     if (bag.isOpen())
     {
         std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag

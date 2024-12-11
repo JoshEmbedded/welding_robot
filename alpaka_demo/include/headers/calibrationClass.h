@@ -15,6 +15,7 @@
 #include <alpaka_demo/ProcessBag.h>
 #include <geometry_msgs/Quaternion.h>
 #include <tf2/LinearMath/Quaternion.h>
+#include <tf2/LinearMath/Matrix3x3.h>
 #include <mutex>
 
 #include <boost/foreach.hpp>
@@ -41,7 +42,7 @@ public:
     bool robotMovement(const geometry_msgs::Pose &goal_pose);
     bool jointMovement(const sensor_msgs::JointState joints);
     bool cartesianMovement(std::vector<geometry_msgs::Pose> &goal_poses, moveit::planning_interface::MoveGroupInterface::Plan &plan);
-    geometry_msgs::Pose offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float w, float x, float y, float z);
+    geometry_msgs::Pose offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float roll_offset, float pitch_offset, float yaw_offset);
     bool sensorCalibration();
     bool recordCalibration(geometry_msgs::Pose pose);
     void readCalibrationData();
