@@ -40,16 +40,17 @@ def transform_point(sensor_point, rotation_matrix, translation_vector):
 if __name__ == '__main__':
     
     robot_pose = []
-    robot_pose.append(-0.92535)
-    robot_pose.append(-0.09219)
-    robot_pose.append(0.83867)
+    robot_pose.append(-0.54826)
+    robot_pose.append(-0.50286)
+    robot_pose.append(0.70163)
     # rx = 0.221
     # ry = 0.518
     # rz = -0.024
     
-    point_x = 0.00997
+    point_x = 0.00854
+    point_x = -point_x #x axis is inversed on sensor plane
     point_y = 0 #only scans along x,z plane
-    point_z = 0.11261
+    point_z = 0.135
     point_scanned = [point_x, point_y, point_z]
     
     offset_x = 0
@@ -61,11 +62,11 @@ if __name__ == '__main__':
     sensor_to_TCP_rotation = sensor_to_TCP_rotation.as_matrix()
     
     transformed_point = transform_point(point_scanned, sensor_to_TCP_rotation, sensor_to_TCP_translation)
-    print("Transfored Point:", transformed_point)
+    print("Relative point to robot pose:", transformed_point)
     robot_pose[0]+=transformed_point[0]
     robot_pose[1]+=transformed_point[1]
     robot_pose[2]+=transformed_point[2]
-    print(robot_pose)
+    print("Updated robot position:", robot_pose )
     # print(sensor_to_TCP_rotation)
     
     # rotation = R.from_euler('xyz', [rx, ry, rz], degrees=False)

@@ -506,6 +506,7 @@
     <!-- Define the laser sensor and attach the plugin -->
     <gazebo reference="laser_scanner_link">
         <sensor name="laser_scan" type="ray">
+        <visualize>true</visualize> <!-- Enable ray visualization -->\
             <origin rpy="0 0 0" xyz="0 0 0" />
             <ray>
                 <scan>
