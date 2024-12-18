@@ -2,6 +2,7 @@
 
 import rospy
 from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import Pose
 from visualization_msgs.msg import Marker
 
 class WeldSeamPoseSubscriber:
@@ -11,11 +12,19 @@ class WeldSeamPoseSubscriber:
 
         # Initialize the PoseStamped storage
         self.current_pose = PoseStamped()
+        self.id = 1
 
         # Create a subscriber for the /weld_seam_pose topic
         self.subscriber = rospy.Subscriber(
             '/weld_seam_pose',
             PoseStamped,
+            self.poseStamped_callback
+        )
+        
+        # Create a subscriber for the /weld_seam_pose topic
+        self.subscriber2 = rospy.Subscriber(
+            '/pose_viz',
+            Pose,
             self.pose_callback
         )
         
@@ -23,7 +32,7 @@ class WeldSeamPoseSubscriber:
 
         rospy.loginfo("Weld seam pose subscriber initialized.")
 
-    def pose_callback(self, msg):
+    def poseStamped_callback(self, msg):
         """
         Callback function for the /weld_seam_pose topic.
         """
@@ -32,7 +41,25 @@ class WeldSeamPoseSubscriber:
         rospy.loginfo(f"Received pose: {self.current_pose}")
         self.create_arrow_marker(self.current_pose)
         
-    def create_arrow_marker(self, pose_stamped, marker_id=0, scale=0.01, color=(1.0, 0.0, 0.0, 1.0)):
+    def pose_callback(self, msg):
+        """
+        Callback function for the /pose_viz topic.
+        """
+        # Store the received PoseStamped message
+        self.current_pose = msg
+        rospy.loginfo(f"Received pose: {self.current_pose}")
+        self.pose2poseStamped(self.current_pose)
+        
+    def pose2poseStamped(self, pose):
+        
+        converted_pose = PoseStamped()
+        converted_pose.header.frame_id = "tcp_eff"
+        converted_pose.header.stamp = rospy.Time(0)
+        converted_pose.pose = pose
+        self.create_arrow_marker(converted_pose, color=(0, 0, 1, 1))
+        
+        
+    def create_arrow_marker(self, pose_stamped, marker_id=0, scale=0.001, color=(1.0, 0.0, 0.0, 1.0)):
         """
         Creates an arrow marker for a PoseStamped message.
 

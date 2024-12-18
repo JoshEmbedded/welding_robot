@@ -38,6 +38,7 @@ catkin_install_python(PROGRAMS
   src/scan_pose.py
   src/scan_test.py
   src/marker_publish.py
+  src/laser_scan_viz.py
   src/transformCalculation.py
   src/move_robot.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
