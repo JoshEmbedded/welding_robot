@@ -138,7 +138,7 @@ def calculate_pose(laser_scan, scan_index):
     r = laser_scan.ranges[scan_index]
     
     # update r to ensure end-effector doesn't move less than min sensor range (0.074)
-    r = r - 0.030
+    r = r
     
     rospy.loginfo(f"updated range: {r}")
     # If the range is invalid (NaN or infinite), return None
