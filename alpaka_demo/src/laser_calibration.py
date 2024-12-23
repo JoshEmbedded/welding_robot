@@ -74,7 +74,6 @@ def convertData(laser_scan):
 def find_seam(data):
     
     range_data = [item[0] for item in data]
-    
     edge = False
     index = -1
     for i in range(1, len(range_data) - 1):  # Avoid the first and last elements
@@ -94,7 +93,10 @@ def find_seam(data):
         #     edge = True
     
     if edge:
+        print("SEAM DETECTED")
         return data[index]
+    else:
+        print("FAILURE TO DETECT ANY SEAM")
         
 def find_seam_from_bag(bag_path):
     try:
@@ -107,10 +109,11 @@ def find_seam_from_bag(bag_path):
         # Process LaserScan messages
         for topic, msg, t in bag.read_messages(topics=['laser_scan']):
             converted_data = convertData(msg)
-            if find_seam(converted_data) is None:
-                continue
-            else:
-                direction_change.append(find_seam(converted_data));
+            # if find_seam(converted_data) is None:
+            #     continue
+            # else:
+            #     direction_change.append(find_seam(converted_data));
+            direction_change.append(converted_data[50])
         
         vulcram_centre = find_seam(direction_change)
         bag.close()
@@ -190,6 +193,7 @@ def get_pose(bag_path, centre_point):
 def handle_process_bag(req):
     rospy.loginfo(f"Received request to process rosbag: {req.bag_path}")
     vulcram_centre_scan = find_seam_from_bag(req.bag_path)
+    print(f"Vulcram centre scan: {vulcram_centre_scan}")
     
     x,y,angle = get_pose(req.bag_path, vulcram_centre_scan)
     

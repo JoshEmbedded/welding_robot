@@ -406,8 +406,20 @@ geometry_msgs::Pose LaserCalibration::getSensorTransform()
     return sensor_transform;
 }
 
+sensor_msgs::LaserScan LaserCalibration::getLaserScan()
+{
+    return laser_scan;
+}
+
+sensor_msgs::JointState LaserCalibration::getJointScan()
+{
+    return calculated_joints;
+}
+
+
 void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr &msg)
 {
+    laser_scan = *msg;
     if (bag.isOpen())
     {
         std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
@@ -423,8 +435,6 @@ void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPt
         bag.write("joint_states", ros::Time::now(), *msg);
     }
 }  
-
-
 
 void LaserCalibration::readCalibrationData()
 {
@@ -463,4 +473,6 @@ void LaserCalibration::readCalibrationData()
 
     bag.close();
 }
+
+
 

@@ -49,11 +49,13 @@ public:
     bool processScan();
     geometry_msgs::Pose calculateTransform();
     geometry_msgs::Pose getSensorTransform();
+    sensor_msgs::LaserScan getLaserScan();
+    sensor_msgs::JointState getJointScan();
+    moveit::planning_interface::MoveGroupInterface move_group;
     std::string bag_path;
 
 private:
     ros::NodeHandle nh;
-    moveit::planning_interface::MoveGroupInterface move_group;
     moveit::planning_interface::MoveGroupInterface::Plan plan;
     rosbag::Bag bag;
     bool bag_open;
@@ -62,6 +64,7 @@ private:
     ros::Subscriber scan_sub;
     ros::Subscriber joint_sub;
     std::mutex bag_mutex;  // Mutex to protect the bag file
+    sensor_msgs::LaserScan laser_scan;
     sensor_msgs::JointState calculated_joints;
     float sensor_tilt;
     geometry_msgs::Point service_offset;

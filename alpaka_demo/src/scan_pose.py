@@ -24,7 +24,31 @@ def normalize_angle(angle):
     while angle < -math.pi:
         angle += 2 * math.pi
     return angle
+
+def laser_scan_to_cartesian(range, angle):
+    # Convert polar coordinates (range, angle) to Cartesian coordinates (x, y)
+    x = range * math.cos(angle)
+    y = range * math.sin(angle)
+    return x, y
+
+def calculate_pose(scan_msg, scan_index):
     
+    if scan_index < 0 or scan_index >= len(scan_msg.ranges):
+        rospy.logwarn(f"Invalid scan index {scan_index}. Must be between 0 and {len(scan_msg.ranges)-1}.")
+        return None
+    
+    # Get the range (distance) at the given index
+    r = scan_msg.ranges[scan_index]
+    
+    listener = tf.TransformListener()
+    
+    # Wait for the transformation between the laser and base frames
+    try:
+        listener.waitForTransform('/base_link', '/laser_sensor_link', rospy.Time(), rospy.Duration(4.0))
+        
+    except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+        rospy.logerr(f"Error in TF: {e}")  
+
 def calculate_pose_from_scan(scan_msg, scan_index):
     """
     Calculate the pose (x, y) from a selected laser scan index.
@@ -61,8 +85,8 @@ def calculate_pose_from_scan(scan_msg, scan_index):
 
     # Return the pose as a tuple (x, y, angle)
     return (x, y, angle)
-    
 
+    
 
 def laser_scan_listener():
     """

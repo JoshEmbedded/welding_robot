@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<sdf version="1.6">
+  <model name="calibration_plate">
+    <pose>0 0 0 0 0 0</pose>
+    <static>true</static>
+    <link name="link">
+      <inertial>
+        <mass>1e-6</mass>
+        <inertia> ixx="1e-6" iyy="1e-6" izz="1e-6" </inertia> 
+      </inertial>
+      <collision name="collision">
+        <geometry>
+          <mesh>
+            <uri>model://calibration_plate/meshes/calibration_plate.stl</uri>
+          </mesh>
+        </geometry>
+      </collision>
+      <visual name="visual">
+        <geometry>
+          <mesh>
+            <uri>model://calibration_plate/meshes/calibration_plate.dae</uri>
+          </mesh>
+        </geometry>
+        <material>Gazebo/DarkGrey</material>
+      </visual>
+    </link>
+  </model>
+</sdf>
