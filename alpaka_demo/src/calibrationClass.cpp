@@ -1,10 +1,17 @@
 #include "headers/calibrationClass.h"
 
 LaserCalibration::LaserCalibration(const std::string &group_name, ros::NodeHandle node_handle)
-    : move_group(group_name), nh(node_handle), bag_open(false), sensor_tilt(-1.8579793)
+    : move_group(group_name), nh(node_handle), bag_open(false), sensor_tilt(-1.8579793), scan_sync_sub(nh, "laser_scan", 1),
+    joint_sync_sub(nh, "joint_states", 1, ros::TransportHints().tcpNoDelay())
 {
-    scan_sub = nh.subscribe("laser_scan", 10, &LaserCalibration::laserScanCallback, this);
-    joint_sub = nh.subscribe("joint_states", 10, &LaserCalibration::jointStateCallback, this);
+    move_group.setWorkspace(-2.0, -2.0, 0.01, 2.0, 2.0, 2.0);
+    // Initialize the synchronizer with ApproximateTime policy
+    sync = std::make_unique<message_filters::Synchronizer<MySyncPolicy>>(MySyncPolicy(10), scan_sync_sub, joint_sync_sub);
+
+    // Register the callback
+    sync->registerCallback(boost::bind(&LaserCalibration::callback, this, _1, _2));
+    scan_sub = nh.subscribe("laser_scan", 10, &LaserCalibration::laserScanCallback, this, ros::TransportHints().tcpNoDelay());
+    joint_sub = nh.subscribe("joint_states", 10, &LaserCalibration::jointStateCallback, this, ros::TransportHints().tcpNoDelay());
 }
 
 bool LaserCalibration::handlePlanError(const moveit::core::MoveItErrorCode &my_plan, const std::string planning = "planning")
@@ -88,8 +95,11 @@ bool LaserCalibration::computeTrajectory(const geometry_msgs::PoseStamped &goal_
 bool LaserCalibration::robotMovement(const geometry_msgs::Pose &goal_pose)
 {
     move_group.setPoseTarget(goal_pose);
+    move_group.setMaxVelocityScalingFactor(0.05);
+    move_group.setMaxAccelerationScalingFactor(0.05);
     if (handlePlanError(move_group.plan(plan), "planning"))
     {
+        
         if (handlePlanError(move_group.execute(plan), "execution"))
         {
             return true;
@@ -101,9 +111,11 @@ bool LaserCalibration::robotMovement(const geometry_msgs::Pose &goal_pose)
 bool LaserCalibration::jointMovement(const sensor_msgs::JointState joints)
 {
     move_group.setJointValueTarget(joints);
-
+    move_group.setMaxVelocityScalingFactor(0.05);
+    move_group.setMaxAccelerationScalingFactor(0.05);
     if (handlePlanError(move_group.plan(plan), "planning"))
     {
+        
         if (handlePlanError(move_group.execute(plan), "execution"))
         {
             return true;
@@ -112,13 +124,27 @@ bool LaserCalibration::jointMovement(const sensor_msgs::JointState joints)
     return false;
 }
 
-bool LaserCalibration::cartesianMovement(std::vector<geometry_msgs::Pose> &goal_poses, moveit::planning_interface::MoveGroupInterface::Plan &plan)
+bool LaserCalibration::cartesianMovement(std::vector<geometry_msgs::Pose> &goal_poses)
 {
     moveit_msgs::RobotTrajectory trajectory;
-    double fraction = move_group.computeCartesianPath(goal_poses, 0.01, 0.0, trajectory);
+    double fraction = move_group.computeCartesianPath(goal_poses, 0.001, 0.0, trajectory);
     ROS_INFO("Cartesian path achieved: %.2f%%", fraction * 100.0);
     plan.trajectory_ = trajectory;
-    return fraction > 0.8 && handlePlanError(move_group.plan(plan), "planning") && handlePlanError(move_group.execute(plan), "execution");
+    move_group.setMaxVelocityScalingFactor(0.05);
+    move_group.setMaxAccelerationScalingFactor(0.05);
+    bool movement = handlePlanError(move_group.execute(plan), "execution");
+    return movement;
+}
+
+moveit_msgs::RobotTrajectory LaserCalibration::calculateCartesian(geometry_msgs::Pose start, geometry_msgs::Pose end)
+{
+    moveit_msgs::RobotTrajectory trajectory;
+    std::vector<geometry_msgs::Pose> poses;
+    poses.push_back(start);
+    poses.push_back(end);
+    double fraction = move_group.computeCartesianPath(poses, 0.0001, 0.0, trajectory);
+    ROS_INFO("Cartesian path computed with %f%% success rate", fraction * 100.0);
+    return trajectory;
 }
 
 geometry_msgs::Pose LaserCalibration::offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float roll_offset, float pitch_offset, float yaw_offset)
@@ -279,7 +305,9 @@ bool LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
         {
             ROS_ERROR("Calibration scan failed.");
         }
-        std::lock_guard<std::mutex> lock(bag_mutex); 
+        std::lock_guard<std::mutex> lock(bag_mutex);
+        scan_sub.shutdown();
+        joint_sub.shutdown(); 
         bag.close();
         ROS_INFO("Bag Closed");
         record = true;
@@ -288,8 +316,7 @@ bool LaserCalibration::recordCalibration(geometry_msgs::Pose pose)
         record = false;
     }
 
-    scan_sub.shutdown();
-    joint_sub.shutdown();
+  
     ros::Duration(0.05).sleep();
 
     return record;
@@ -422,8 +449,15 @@ void LaserCalibration::laserScanCallback(const sensor_msgs::LaserScan::ConstPtr 
     laser_scan = *msg;
     if (bag.isOpen())
     {
-        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
-        bag.write("laser_scan", ros::Time::now(), *msg);
+        try
+        {
+            std::lock_guard<std::mutex> lock(bag_mutex);
+            bag.write("laser_scan", msg->header.stamp, *msg);
+        }
+        catch (const rosbag::BagIOException &e)
+        {
+            ROS_ERROR("Failed to write laser scan to bag: %s", e.what());
+        }
     }
 }
 
@@ -431,10 +465,27 @@ void LaserCalibration::jointStateCallback(const sensor_msgs::JointState::ConstPt
 {
     if (bag.isOpen())
     {
-        std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
-        bag.write("joint_states", ros::Time::now(), *msg);
+        try
+        {
+            std::lock_guard<std::mutex> lock(bag_mutex);
+            bag.write("joint_states", msg->header.stamp, *msg);
+        }
+        catch (const rosbag::BagIOException &e)
+        {
+            ROS_ERROR("Failed to write joint states to bag: %s", e.what());
+        }
     }
-}  
+}
+
+void LaserCalibration::callback(const sensor_msgs::LaserScanConstPtr& laser_scan, const sensor_msgs::JointStateConstPtr& joint_state)
+{
+    // if (bag.isOpen())
+    // {
+    //     std::lock_guard<std::mutex> lock(bag_mutex); // Ensure thread-safe access to the bag
+    //     bag.write("laser_scan", laser_scan->header.stamp, *laser_scan);
+    //     bag.write("joint_states", joint_state->header.stamp, *joint_state);
+    // }
+}
 
 void LaserCalibration::readCalibrationData()
 {

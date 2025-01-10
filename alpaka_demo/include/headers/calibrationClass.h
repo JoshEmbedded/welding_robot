@@ -17,6 +17,11 @@
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2/LinearMath/Matrix3x3.h>
 #include <mutex>
+#include <message_filters/subscriber.h>
+#include <message_filters/time_synchronizer.h>
+#include <message_filters/sync_policies/approximate_time.h>
+using namespace sensor_msgs;
+using namespace message_filters;
 
 #include <boost/foreach.hpp>
 #define foreach BOOST_FOREACH
@@ -34,14 +39,15 @@ public:
             bag.close();
             ROS_INFO("Bag file closed.");
         }
-        scan_sub.shutdown();
+        // scan_sub.shutdown();
     };
 
     bool handlePlanError(const moveit::core::MoveItErrorCode& my_plan, const std::string planning);
     bool computeTrajectory(const geometry_msgs::PoseStamped &goal_pose, moveit::planning_interface::MoveGroupInterface::Plan &plan);
     bool robotMovement(const geometry_msgs::Pose &goal_pose);
     bool jointMovement(const sensor_msgs::JointState joints);
-    bool cartesianMovement(std::vector<geometry_msgs::Pose> &goal_poses, moveit::planning_interface::MoveGroupInterface::Plan &plan);
+    bool cartesianMovement(std::vector<geometry_msgs::Pose> &goal_poses);
+    moveit_msgs::RobotTrajectory calculateCartesian(geometry_msgs::Pose start, geometry_msgs::Pose end);
     geometry_msgs::Pose offsetMovement(geometry_msgs::Pose &pose, float X, float Y, float Z, float roll_offset, float pitch_offset, float yaw_offset);
     bool sensorCalibration();
     bool recordCalibration(geometry_msgs::Pose pose);
@@ -71,6 +77,13 @@ private:
     geometry_msgs::Pose sensor_transform;
     geometry_msgs::Pose tcp_transform;
     geometry_msgs::Point vulcram_point;
+    void callback(const sensor_msgs::LaserScanConstPtr& laser_scan, const sensor_msgs::JointStateConstPtr& joint_state);
+    message_filters::Subscriber<sensor_msgs::LaserScan> scan_sync_sub;
+    message_filters::Subscriber<sensor_msgs::JointState> joint_sync_sub;
+    typedef message_filters::sync_policies::ApproximateTime<sensor_msgs::LaserScan, sensor_msgs::JointState> MySyncPolicy;
+    std::unique_ptr<message_filters::Synchronizer<MySyncPolicy>> sync;
+    
+
 };
 
 #endif // LASER_CALIBRATION_H
