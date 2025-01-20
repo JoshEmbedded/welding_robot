@@ -2,13 +2,14 @@ import sys  # Add this import to resolve the NameError
 import rospy
 import moveit_commander
 import tf
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, PointCloud2
 from geometry_msgs.msg import PoseStamped, Pose
 from std_msgs.msg import Header
 import math
 import tf.transformations as tft
 import tf2_ros
 import tf2_geometry_msgs
+from laser_geometry import LaserProjection
 
 class RobotMovement:
     def __init__(self):
@@ -27,6 +28,7 @@ class RobotMovement:
 
         # Set up the laser scan subscriber
         rospy.Subscriber("/laser_scan", LaserScan, self.laser_scan_callback, tcp_nodelay=True)
+        self.cloud_pub = rospy.Publisher('cloud_publisher', PointCloud2, queue_size=10)
 
         # To store the latest laser scan and flange position
         self.latest_scan = None
@@ -36,6 +38,7 @@ class RobotMovement:
         self.data_storage = []
         self.rate = rospy.Rate(15)  # 10 Hz
         self.counter = 0
+        self.projector = LaserProjection()
 
     def move_robot(self, pose, blocking=True):
         # Set the target pose for the robot
@@ -57,6 +60,7 @@ class RobotMovement:
     def laser_scan_callback(self, msg):
         # Store the latest laser scan data
         self.latest_scan = msg
+        self.cloud_msg = self.projector.projectLaser(msg)
         if self.scanning:
             self.record_data()
             self.counter +=1
@@ -82,10 +86,13 @@ class RobotMovement:
             if self.latest_scan and self.latest_flange_position:
                 scan_and_flange_data = {
                     'laser_scan': self.latest_scan.ranges,
+                    'point_cloud': self.cloud_msg,
                     'trans': self.latest_flange_position,
                     'rot': self.latest_flange_rotation
                 }
                 self.data_storage.append(scan_and_flange_data)
+                self.cloud_pub.publish(self.cloud_msg)
+                
                 # rospy.loginfo(f"Recorded laser scan and flange position.")
             else:
                 rospy.logwarn("Missing laser scan data or flange position")
@@ -308,6 +315,8 @@ if __name__ == '__main__':
         scan_data = []
         
         for i, square_pose in enumerate(square_pose_list):
+            if i == 2:
+                break
             robot_movement.scanning = False
             print(f"Scan Counter: {robot_movement.counter}")
             robot_movement.counter = 0
@@ -322,6 +331,7 @@ if __name__ == '__main__':
                 robot_movement.move_robot(move, True)
         robot_movement.scanning = False
         scan_data.append(robot_movement.data_storage)
+        print(f"cloud data: {scan_data[0][0].get('point_cloud', None)}")
             
     except rospy.ROSInterruptException:
         pass
