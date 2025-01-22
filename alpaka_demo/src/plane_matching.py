@@ -12,6 +12,9 @@ import tf2_geometry_msgs
 from laser_geometry import LaserProjection
 import numpy as np
 import open3d as o3d
+import json
+import pickle
+import copy
 
 class RobotMovement:
     def __init__(self):
@@ -41,6 +44,8 @@ class RobotMovement:
         self.rate = rospy.Rate(15)  # 10 Hz
         self.counter = 0
         self.projector = LaserProjection()
+        self.plane_parameters = []  # To store plane parameters for each scan
+        self.errors = []  # To store residual errors for each scan
 
     def move_robot(self, pose, blocking=True):
         # Set the target pose for the robot
@@ -75,10 +80,9 @@ class RobotMovement:
             # Wait for the transform to be available
             self.listener.waitForTransform('/world', '/flange', rospy.Time(0), rospy.Duration(1.0))
             # Get the current position of the flange
-            (trans, rot) = self.listener.lookupTransform('/world', '/flange', rospy.Time(0))
-            self.latest_flange_position = trans
-            self.latest_flange_rotation = rot
-            # rospy.loginfo(f"Received flange position: {trans}")
+            (robot_trans, robot_rot) = self.listener.lookupTransform('/world', '/flange', rospy.Time(0))
+            self.latest_flange_position = robot_trans
+            self.latest_flange_rotation = robot_rot
         except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
             rospy.logwarn(f"Could not get flange position: {e}")
 
@@ -88,12 +92,13 @@ class RobotMovement:
             self.get_flange_position()
             if self.latest_scan and self.latest_flange_position:
                 scan_and_flange_data = {
-                    'laser_scan': self.latest_scan,
+                    'laser_scan': copy.deepcopy(self.latest_scan),
                     # 'point_cloud': self.cloud_msg, #point cloud storage
-                    'trans': self.latest_flange_position,
-                    'rot': self.latest_flange_rotation
+                    'trans': copy.deepcopy(self.latest_flange_position),
+                    'rot': copy.deepcopy(self.latest_flange_rotation)
                 }
-                self.data_storage.append(scan_and_flange_data)
+                self.data_storage.append(copy.deepcopy(scan_and_flange_data))
+                rospy.loginfo(f"Recorded data: trans={self.latest_flange_position}, rot={self.latest_flange_rotation}")
                 # Publish point cloud
                 # self.cloud_pub.publish(self.cloud_msg)
                 
@@ -273,7 +278,7 @@ class RobotMovement:
 
         return np.array(world_points)
     
-    def fit_plane_ransac(self, points, distance_threshold=0.02, ransac_n=3, num_iterations=2000):
+    def fit_plane_ransac(self, points, distance_threshold=0.01, ransac_n=3, num_iterations=2500):
         """
         Fit a plane to the given points using RANSAC.
         """
@@ -319,7 +324,7 @@ class RobotMovement:
         return plane_model, inliers
     
     def process_laser_scans(self, data_storage):
-        all_world_points = []
+        all_world_inliers = []
         all_fitted_planes = [] # Store plane models and point clou
 
         for i, scan_pass in enumerate(data_storage):
@@ -341,6 +346,8 @@ class RobotMovement:
                 
             # Step 2: Fit a plane to the world points using RANSAC
             aggregated_points = np.array(aggregated_points)
+            
+            
             rospy.loginfo(f"Scan Pass {i + 1}: {len(aggregated_points)} points")
             distances = np.linalg.norm(np.diff(aggregated_points, axis=0), axis=1)
             print(f"Min Distance: {np.min(distances)}, Max Distance: {np.max(distances)}")
@@ -352,6 +359,7 @@ class RobotMovement:
 
             plane_model, inliers = self.fit_plane_ransac(aggregated_points)
             
+            all_world_inliers.extend(np.array(aggregated_points[inliers]))
             # Store results
             all_fitted_planes.append({
                 'plane_model': plane_model,  # Plane coefficients [a, b, c, d]
@@ -359,11 +367,11 @@ class RobotMovement:
                 'world_points': aggregated_points  # All points in world frame
             })
             
-            self.visualize_with_open3d(all_fitted_planes, interval=1, size=0.05, resolution=20)
+        self.visualize_with_open3d(all_fitted_planes, np.array(all_world_inliers), interval=1, size=0.05, resolution=20)
 
         return all_fitted_planes
     
-    def create_plane_mesh(self, plane_model, center, size=0.01, resolution=10):
+    def create_plane_mesh(self, plane_model, inlier_points, size=0.2, resolution=10):
         """
         Create a plane mesh for visualization.
         :param plane_model: Coefficients [a, b, c, d] of the plane equation ax + by + cz + d = 0.
@@ -384,6 +392,10 @@ class RobotMovement:
 
         # Create vertices for the mesh
         vertices = np.vstack((xx.ravel(), yy.ravel(), zz.ravel())).T
+        
+        # Translate the vertices to align with inlier points
+        centroid = np.mean(inlier_points, axis=0)
+        vertices += centroid
 
         # Create triangles for the grid
         triangles = []
@@ -395,26 +407,36 @@ class RobotMovement:
 
         # Create Open3D TriangleMesh
         mesh = o3d.geometry.TriangleMesh()
-        mesh.vertices = o3d.utility.Vector3dVector(vertices + center)  # Translate to the plane center
+        mesh.vertices = o3d.utility.Vector3dVector(vertices)  # Translate to the plane center
         mesh.triangles = o3d.utility.Vector3iVector(triangles)
         mesh.compute_vertex_normals()
         
         return mesh
 
-    def visualize_with_open3d(self, fitted_planes, interval=1, size=0.1, resolution=20):
+    def visualize_with_open3d(self, fitted_planes, aggregated_points, interval=1, size=0.1, resolution=20):
         """
         Visualize aggregated planes and inliers in 3D.
         """
         geometries = []
 
         # Add a coordinate frame
-        
-        # Add a scaled grid
-        grid = self.create_scaled_grid(size=0.1, resolution=10)
-        geometries.append(grid)
-    
         axis = o3d.geometry.TriangleMesh.create_coordinate_frame(size=0.05)
         geometries.append(axis)
+        
+        # Add a scaled grid based on aggregated points
+        if len(aggregated_points) > 0:
+            grid = self.create_scaled_grid(data=aggregated_points, size=0.2, resolution=20)
+            geometries.append(grid)
+        else:
+            rospy.logwarn("No points available to scale the grid.")
+        
+        colors = [
+        [1.0, 0.0, 0.0],  # Red
+        [0.0, 1.0, 0.0],  # Green
+        [0.0, 0.0, 1.0],  # Blue
+        [1.0, 1.0, 0.0],  # Yellow
+        ]
+        
 
         for i, plane_data in enumerate(fitted_planes):
             if i % interval != 0:
@@ -422,123 +444,270 @@ class RobotMovement:
 
             plane_model = plane_data['plane_model']  # [a, b, c, d]
             inlier_points = np.array(plane_data['world_points'])[plane_data['inliers']]  # Extract inliers
-            plane_center = np.mean(inlier_points, axis=0)  # Use centroid as a point on the plane
+            return
 
             # Create a plane mesh
-            plane_mesh = self.create_plane_mesh(plane_model, plane_center, size=size, resolution=resolution)
-            plane_mesh.paint_uniform_color(np.random.rand(3))  # Random color for each plane
+            plane_mesh = self.create_plane_mesh(plane_model, inlier_points, size=size, resolution=resolution)
+            plane_mesh.paint_uniform_color(colors[i])  # Random color for each plane
             geometries.append(plane_mesh)
 
             # Create point cloud for inliers
             pcd = o3d.geometry.PointCloud()
             pcd.points = o3d.utility.Vector3dVector(inlier_points)
-            pcd.paint_uniform_color([0.1, 0.9, 0.1])  # Green for points
+            pcd.paint_uniform_color(colors[i])  # Green for points
             geometries.append(pcd)
 
         # Visualize all geometries
         o3d.visualization.draw_geometries(geometries)
     
-    def create_scaled_grid(self, size=0.05, resolution=10):
+    def create_scaled_grid(self, data, size=0.1, resolution=10):
         """
         Create a scaled grid for visualization.
         :param size: Total extent of the grid (meters).
         :param resolution: Number of lines along each axis.
         :return: Open3D LineSet representing the grid.
         """
+        
+         # Ensure data is a numpy array
+        data = np.array(data)
+    
+        # Compute bounds of the points
+        min_bound = np.min(data, axis=0)
+        max_bound = np.max(data, axis=0)
+        center = (min_bound + max_bound) / 2
+    
         lines = []
-        points = []
+        grid_points = []
 
         step = size / resolution
         for i in range(-resolution, resolution + 1):
             # Lines parallel to the X-axis
-            points.append([i * step, -size / 2, 0])
-            points.append([i * step, size / 2, 0])
-            lines.append([len(points) - 2, len(points) - 1])
+            grid_points.append([i * step, -size / 2, center[2]])
+            grid_points.append([i * step, size / 2, center[2]])
+            lines.append([len(grid_points) - 2, len(grid_points) - 1])
 
             # Lines parallel to the Y-axis
-            points.append([-size / 2, i * step, 0])
-            points.append([size / 2, i * step, 0])
-            lines.append([len(points) - 2, len(points) - 1])
+            grid_points.append([-size / 2, i * step, center[2]])
+            grid_points.append([size / 2, i * step, center[2]])
+            lines.append([len(grid_points) - 2, len(grid_points) - 1])
 
         # Create a LineSet
         line_set = o3d.geometry.LineSet()
-        line_set.points = o3d.utility.Vector3dVector(points)
+        line_set.points = o3d.utility.Vector3dVector(grid_points)
         line_set.lines = o3d.utility.Vector2iVector(lines)
         line_set.paint_uniform_color([0.5, 0.5, 0.5])  # Gray grid lines
 
-        return line_set
+        return line_set    
+
+    def construct_linear_system(self, points):
+        """
+        Constructs the A matrix and b vector for plane fitting.
+        
+        Args:
+            points (np.ndarray): Array of points of shape (N, 3), where each row is (x, y, z).
+        
+        Returns:
+            tuple: A matrix (N, 3), b vector (N,).
+        """
+        A = points[:, :2]  # Use x and y for A
+        A = np.hstack((A, np.ones((A.shape[0], 1))))  # Add the constant column for d
+        b = points[:, 2]  # Use z for b
+        return A, b
+
+    def solve_plane(self, A, b):
+        """
+        Solves the linear system to find the best-fit plane parameters.
+        
+        Args:
+            A (np.ndarray): Matrix constructed from x, y points (N, 3).
+            b (np.ndarray): Vector of z values (N,).
+        
+        Returns:
+            np.ndarray: Plane parameters [a, b, d].
+        """
+        pseudo_inverse = np.linalg.pinv(A)  # Use pseudo-inverse for over-determined systems
+        plane_params = np.dot(pseudo_inverse, b)  # Solve for [a, b, d]
+        return plane_params
+
+    def calculate_residuals(self, A, b, plane_params):
+        """
+        Calculates residuals (errors) for the given plane fit.
+        
+        Args:
+            A (np.ndarray): Matrix constructed from x, y points (N, 3).
+            b (np.ndarray): Vector of z values (N,).
+            plane_params (np.ndarray): Plane parameters [a, b, d].
+        
+        Returns:
+            np.ndarray: Residuals for each data point.
+        """
+        predicted_b = np.dot(A, plane_params)  # Predicted z values
+        residuals = b - predicted_b  # Calculate residuals
+        return residuals
+
+    def fit_plane_for_scan(self, scan_itt):
+        """
+        Fits a plane to the given set of points and calculates residuals.
+        
+        Args:
+            points (np.ndarray): Array of points of shape (N, 3), where each row is (x, y, z).
+        
+        Returns:
+            tuple: Plane parameters [a, b, d] and residuals.
+        """
+        print(f"shape of scan: {scan_itt.shape}")
+
+        A, b = self.construct_linear_system(scan_itt)
+        plane_params = self.solve_plane(A, b)
+        residuals = self.calculate_residuals(A, b, plane_params)
+        return plane_params, residuals
     
+    
+    def convert_laser_scan_to_list_of_points(self, data):
+        
+        points_per_scan = []
+        
+        for i, scan_pass in enumerate(data):
+            
+            scan_points = []
+            
+            # Step 1: Aggregate all points from the scan pass
+            for data_scan in scan_pass:
+                laser_scan = data_scan['laser_scan']  # geometry_msgs/LaserScan
+                translation = data_scan['trans']
+                rotation = data_scan['rot']
+                # print(f"trans: {translation} rotation: {rotation}")
+                # break
+
+                # Convert LaserScan to 2D points in the sensor frame
+                sensor_points = self.laser_scan_to_points(laser_scan)
+
+                # Transform points to the world frame
+                world_points = self.transform_points_to_world(sensor_points, translation, rotation)
+                
+                # Add the points for this laser scan to the current scan pass
+                scan_points.extend(world_points)
+                
+            # Step 2: Make a list of each scan
+            points_per_scan.append(np.array(scan_points))
+           
+           # Debugging: Print the shape of the aggregated points for the current scan
+            print(f"Scan {i + 1}: {len(scan_points)} points, Shape: {np.array(scan_points).shape}")
+            print(f"Scan {i + 1}: {scan_points[:5]} (Showing first 5 points)")
+
+
+        return points_per_scan   
+            
+        
+    def process_scans(self, data):
+        """
+        Processes multiple scans and fits a plane to each scan separately.
+        
+        Args:
+            scans (list): List of np.ndarray, where each array contains points (N, 3) for one scan.
+        
+        Returns:
+            list: List of dictionaries containing plane parameters and residuals for each scan.
+        """
+        scans = self.convert_laser_scan_to_list_of_points(data)
+        
+        results = []
+        for i, scan in enumerate(scans):
+            # print(f"Processing scan {i + 1}/{len(scans)}, shape: {scan.shape}")
+            plane_params, residuals = self.fit_plane_for_scan(scan)
+            self.plane_parameters.append(plane_params)
+            self.errors.append(residuals)
+            results.append({
+                "scan_index": i,
+                "plane_parameters": plane_params,
+                "residuals": residuals
+            })
+            
+        return results
+        
+
 if __name__ == '__main__':
     try:
         # Create an instance of RobotMovement
         robot_movement = RobotMovement()
         
-        orientations = []
-        square_pose_list = []
+        # orientations = []
+        # square_pose_list = []
         
 
-        # Create a target pose for the robot (example)
-        pose = Pose()
-        pose.position.x = 0.0
-        pose.position.y = 0.35
-        pose.position.z = 0.05
-        pose.orientation.x = 1.0
-        pose.orientation.y = 0.0
-        pose.orientation.z = 0.0
-        pose.orientation.w = 0.0
-        pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -1.57)
-        # Move robot asynchronously (non-blocking)
-        robot_movement.move_robot(pose, True)
-        robot_movement.group.set_max_velocity_scaling_factor(0.05)
-        robot_movement.group.set_max_acceleration_scaling_factor(0.05)
+        # # Create a target pose for the robot (example)
+        # pose = Pose()
+        # pose.position.x = 0.0
+        # pose.position.y = 0.35
+        # pose.position.z = 0.055
+        # pose.orientation.x = 1.0
+        # pose.orientation.y = 0.0
+        # pose.orientation.z = 0.0
+        # pose.orientation.w = 0.0
+        # pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -1.57)
+        # # Move robot asynchronously (non-blocking)
+        # robot_movement.move_robot(pose, True)
+        # robot_movement.group.set_max_velocity_scaling_factor(0.1)
+        # robot_movement.group.set_max_acceleration_scaling_factor(0.1)
         
         
-        rate = rospy.Rate(10)  # 10 Hz
+        # rate = rospy.Rate(10)  # 10 Hz
         
-        orientations.append(pose)
-        x_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, -0.5235, 0, 0) #rotation around x
-        orientations.append(x_rot_pose)
-        y_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0.5235, 0) #rotation around y
-        orientations.append(y_rot_pose)
-        z_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, 0.5235) #rotation around z
-        orientations.append(z_rot_pose)
+        # orientations.append(pose)
+        # x_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, -0.8, 0, 0) #rotation around x
+        # orientations.append(x_rot_pose)
+        # y_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0.8, 0) #rotation around y
+        # orientations.append(y_rot_pose)
+        # z_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, 0.9) #rotation around z
+        # orientations.append(z_rot_pose)
         
-        for orient in orientations:
-            square_pose = []
-            square_pose.append(orient)
-            move_1 = robot_movement.offset_movement(orient, 0, 0.05, 0, 0, 0, 0)
-            square_pose.append(move_1)
-            move_2 = robot_movement.offset_movement(move_1, 0.05, 0, 0, 0, 0, 0)
-            square_pose.append(move_2)
-            move_3 = robot_movement.offset_movement(move_2, 0, -0.05, 0, 0, 0, 0)
-            square_pose.append(move_3)
-            move_4 = robot_movement.offset_movement(move_3, -0.05, 0, 0, 0, 0, 0)
-            square_pose.append(move_4)
-            square_pose_list.append(square_pose)
+        # for orient in orientations:
+        #     square_pose = []
+        #     square_pose.append(orient)
+        #     move_1 = robot_movement.offset_movement(orient, 0, 0.15, 0, 0, 0, 0)
+        #     square_pose.append(move_1)
+        #     move_2 = robot_movement.offset_movement(move_1, 0.15, 0, 0, 0, 0, 0)
+        #     square_pose.append(move_2)
+        #     move_3 = robot_movement.offset_movement(move_2, 0, -0.15, 0, 0, 0, 0)
+        #     square_pose.append(move_3)
+        #     move_4 = robot_movement.offset_movement(move_3, -0.15, 0, 0, 0, 0, 0)
+        #     square_pose.append(move_4)
+        #     square_pose_list.append(square_pose)
         
-        scan_data = []
+        # scan_data = []
         
-        for i, square_pose in enumerate(square_pose_list):
-            if i == 1:
-                break
+        # for i, square_pose in enumerate(square_pose_list):
+        #     # if i == 1:
+        #     #     break
             
-            robot_movement.scanning = False
-            robot_movement.counter = 0
-            print(f"Processing square poses for orientation {i+1}:")
+        #     robot_movement.scanning = False
+        #     robot_movement.counter = 0
+        #     print(f"Processing square poses for orientation {i+1}:")
+        #     if robot_movement.data_storage:
+        #         scan_data.append(copy.deepcopy(robot_movement.data_storage))
+        #     robot_movement.data_storage.clear()
             
-            scan_data.append(robot_movement.data_storage)
-            robot_movement.data_storage.clear()
-            
-            # Iterate over each pose in the current square pose list
-            for j, move in enumerate(square_pose):
-                if j != 0:
-                    robot_movement.scanning = True  
-                print(f"Pose {j+1}: {move}")
-                robot_movement.move_robot(move, True)
-        robot_movement.scanning = False
-        scan_data.append(robot_movement.data_storage)
+        #     # Iterate over each pose in the current square pose list
+        #     for j, move in enumerate(square_pose):
+        #         if j != 0:
+        #             robot_movement.scanning = True  
+        #         print(f"Pose {j+1}: {move}")
+        #         robot_movement.move_robot(move, True)
+        # robot_movement.scanning = False
+        # scan_data.append(copy.deepcopy(robot_movement.data_storage))
         
-        fitted_planes = robot_movement.process_laser_scans(scan_data)
+        # with open("scan_data.pkl", "wb") as f:
+        #     pickle.dump(scan_data, f)
+            
+        
+        
+        with open("scan_data.pkl", "rb") as f:
+            scan_data = pickle.load(f)
+            
+        # print(f"Data stored for processing: {scan_data[0]}")
+        results = robot_movement.process_scans(scan_data)
+        print(results)
+        # fitted_planes = robot_movement.process_laser_scans(scan_data)
         # print(f"fitted_planes size: {len(fitted_planes)}")
         # Display point cloud conversion
         # print(f"cloud data: {scan_data[0][0].get('point_cloud', None)}")
