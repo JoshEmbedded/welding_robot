@@ -275,10 +275,23 @@ class RobotMovement:
             point_hom = np.append(point, 1.0)  # Homogeneous coordinates
             transformed_point = np.dot(transform_matrix, point_hom)[:3]  # Transform
             world_points.append(transformed_point)
-
+            
         return np.array(world_points)
     
-    def fit_plane_ransac(self, points, distance_threshold=0.01, ransac_n=3, num_iterations=2500):
+    def transform_single_point_to_world(self, single_point, trans, rot):
+        """
+        Transform points from the sensor frame to the world frame using the flange transform.
+        """
+        # Create the transformation matrix
+        transform_matrix = tf.transformations.quaternion_matrix(rot)
+        transform_matrix[:3, 3] = trans
+
+        # Transform points
+        point_hom = np.append(single_point, 1.0)  # Homogeneous coordinates
+        transformed_point = np.dot(transform_matrix, point_hom)[:3]  # Transform
+        return transformed_point 
+    
+    def fit_plane_ransac(self, points, distance_threshold=0.01, ransac_n=3, num_iterations=2000):
         """
         Fit a plane to the given points using RANSAC.
         """
@@ -286,7 +299,7 @@ class RobotMovement:
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
 
-        # Apply voxel downsampling (optional)
+        # # Apply voxel downsampling (optional)
         voxel_size = 0.005
         if len(points) > 1000:
             pcd = pcd.voxel_down_sample(voxel_size)
@@ -581,6 +594,9 @@ class RobotMovement:
 
                 # Convert LaserScan to 2D points in the sensor frame
                 sensor_points = self.laser_scan_to_points(laser_scan)
+                
+                # # Filter points for ransac
+                # plane_params, inliers = self.fit_plane_ransac(sensor_points)
 
                 # Transform points to the world frame
                 world_points = self.transform_points_to_world(sensor_points, translation, rotation)
@@ -597,7 +613,23 @@ class RobotMovement:
 
 
         return points_per_scan   
+    
+    def calculate_cost(self, error):
+        """
+        Calculate the cost as the L2 norm of the error vector.
+        
+        Args:
+            error (np.ndarray or list): Array of residual errors for all data points.
             
+        Returns:
+            float: L2 norm of the error vector.
+        """
+        # Sum of squared errors
+        cost = sum(pow(s, 2) for s in error)
+        
+        # Take the square root of the sum
+        return math.sqrt(cost)
+                    
         
     def process_scans(self, data):
         """
@@ -614,17 +646,77 @@ class RobotMovement:
         results = []
         for i, scan in enumerate(scans):
             # print(f"Processing scan {i + 1}/{len(scans)}, shape: {scan.shape}")
-            plane_params, residuals = self.fit_plane_for_scan(scan)
+            plane_params, inliers = self.fit_plane_ransac(scan)
+            plane_params, residuals = self.fit_plane_for_scan(scan[inliers])
+            cost_Fi = self.calculate_cost(residuals)
             self.plane_parameters.append(plane_params)
             self.errors.append(residuals)
             results.append({
                 "scan_index": i,
                 "plane_parameters": plane_params,
-                "residuals": residuals
+                "residuals": residuals,
+                "Fi_cost": cost_Fi
             })
-            
-        return results
         
+        total_cost = sum(F['Fi_cost'] for F in results)
+            
+        return results, total_cost
+    
+    def preprocess_data(self, data):
+        
+        points_per_scan = []
+        
+        for i, scan_pass in enumerate(data):
+            
+            scan_points = []
+            trans_data = []
+            rot_data = []
+            
+            
+            # Step 1: Aggregate all points from the scan pass
+            for data_scan in scan_pass:
+                laser_scan = data_scan['laser_scan']  # geometry_msgs/LaserScan
+                translation = data_scan['trans']
+                rotation = data_scan['rot']
+                # print(f"trans: {translation} rotation: {rotation}")
+                # break
+    
+                # Convert LaserScan to 2D points in the sensor frame
+                sensor_points = self.laser_scan_to_points(laser_scan)
+                
+                # Add the points for this laser scan to the current scan pass
+                scan_points.extend(sensor_points)
+                trans_data.extend([translation] * len(sensor_points))
+                rot_data.extend([rotation] * len(sensor_points))
+            
+            scan_points = np.array(scan_points)
+            trans_data = np.array(trans_data)
+            rot_data = np.array(rot_data)
+            
+            # Filter points for ransac
+            plane_params, inliers = self.fit_plane_ransac(scan_points)
+            print(f"shape of scan_points: {np.array(scan_points).shape}")
+            
+            filtered_points = scan_points[inliers]
+            filtered_trans = trans_data[inliers]
+            filtered_rot = rot_data[inliers]
+            
+            world_points = []
+            
+            for j, point in enumerate(filtered_points):
+                # Transform points to the world frame
+                transformed_point = self.transform_single_point_to_world(point, filtered_trans[j], filtered_rot[j])
+                world_points.append(transformed_point) 
+                
+            # Step 2: Make a list of each scan
+            points_per_scan.append(np.array(world_points))
+           
+           # Debugging: Print the shape of the aggregated points for the current scan
+            # print(f"Scan {i + 1}: {len(world_points)} points, Shape: {np.array(world_points).shape}")
+            # print(f"Scan {i + 1}: {world_points[:5]} (Showing first 5 points)")
+
+        return points_per_scan
+    
 
 if __name__ == '__main__':
     try:
@@ -704,9 +796,13 @@ if __name__ == '__main__':
         with open("scan_data.pkl", "rb") as f:
             scan_data = pickle.load(f)
             
-        # print(f"Data stored for processing: {scan_data[0]}")
-        results = robot_movement.process_scans(scan_data)
-        print(results)
+        # print(f"Data stored for processing: {scan_data[1]}")
+        # results, total_cost = robot_movement.process_scans(scan_data)
+        # print(results)
+        # print(f'total cost: {total_cost}')
+        
+        clean_world_points = robot_movement.preprocess_data(scan_data)
+        print(clean_world_points)
         # fitted_planes = robot_movement.process_laser_scans(scan_data)
         # print(f"fitted_planes size: {len(fitted_planes)}")
         # Display point cloud conversion
