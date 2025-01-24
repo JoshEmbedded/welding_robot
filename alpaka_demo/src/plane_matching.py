@@ -12,9 +12,13 @@ import tf2_geometry_msgs
 from laser_geometry import LaserProjection
 import numpy as np
 import open3d as o3d
-import json
 import pickle
 import copy
+from scipy.optimize import minimize
+from sklearn.linear_model import RANSACRegressor
+from scipy.optimize import least_squares
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 class RobotMovement:
     def __init__(self):
@@ -291,23 +295,47 @@ class RobotMovement:
         transformed_point = np.dot(transform_matrix, point_hom)[:3]  # Transform
         return transformed_point 
     
-    def fit_plane_ransac(self, points, distance_threshold=0.01, ransac_n=3, num_iterations=2000):
+    def transform_points_with_euler(self, points, roll, pitch, yaw):
+        """
+        Transform points using Euler angles (roll, pitch, yaw).
+
+        Args:
+            points (np.ndarray): Array of points to transform (N, 3).
+            roll (float): Rotation around the X-axis (in radians).
+            pitch (float): Rotation around the Y-axis (in radians).
+            yaw (float): Rotation around the Z-axis (in radians).
+
+        Returns:
+            np.ndarray: Transformed points (N, 3).
+        """
+        # Create a rotation matrix from Euler angles
+        rotation_matrix = tf.transformations.euler_matrix(roll, pitch, yaw)[:3, :3]
+
+        # Apply the rotation to all points in one matrix operation
+        transformed_points = np.dot(points, rotation_matrix.T)
+    
+        return np.array(transformed_points)
+    
+    def fit_plane_ransac(self, points, distance_threshold=0.01, ransac_n=3, num_iterations=1000, voxel_size=0.001):
         """
         Fit a plane to the given points using RANSAC.
         """
         # Convert points to Open3D format
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(points)
+        
+        print(f"Point cloud bounds: {pcd.get_min_bound()} to {pcd.get_max_bound()}")
+        print(f"Sample points: {points[:10]}")
 
         # # Apply voxel downsampling (optional)
-        voxel_size = 0.005
-        if len(points) > 1000:
-            pcd = pcd.voxel_down_sample(voxel_size)
+        # voxel_size = voxel_size
+        # if len(points) > 1000:
+        #     pcd = pcd.voxel_down_sample(voxel_size)
         
-        nb_neighbors = 10
-        std_ratio = 3.0
+        # nb_neighbors = 10
+        # std_ratio = 3.0
         
-        pcd, _ = pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
+        # pcd, _ = pcd.remove_statistical_outlier(nb_neighbors, std_ratio)
     
         print(f"size before ransac: {len(pcd.points)}")
         # Perform RANSAC plane fitting
@@ -317,6 +345,7 @@ class RobotMovement:
             num_iterations=num_iterations
         )
         
+        
         distances = np.abs(np.dot(points, plane_model[:3]) + plane_model[3]) / np.linalg.norm(plane_model[:3])
         print(f"Distance stats: Min = {np.min(distances)}, Max = {np.max(distances)}, Mean = {np.mean(distances)}")
 
@@ -325,6 +354,14 @@ class RobotMovement:
             
         # Visualize inliers
         inlier_cloud = pcd.select_by_index(inliers)
+        
+        # Convert Open3D point cloud to NumPy array
+        inlier_points = np.asarray(inlier_cloud.points)
+        distances = np.abs(np.dot(inlier_points, plane_model[:3]) + plane_model[3]) / np.linalg.norm(plane_model[:3])
+        print(f"Distances: {distances[:10]}")
+        print(f"inlier data: {np.asarray(inlier_cloud.points)}")
+        
+        
         inlier_cloud.paint_uniform_color([1.0, 0.0, 0.0])  # Red for inliers
 
         # Visualize outliers
@@ -334,6 +371,47 @@ class RobotMovement:
         # Draw the inliers and outliers
         o3d.visualization.draw_geometries([inlier_cloud, outlier_cloud])
             
+        return plane_model, inliers
+    
+    def fit_ransac_2d(self, points, distance_threshold=0.001):
+        """
+        Perform RANSAC for a 2D dataset (x and z coordinates).
+        
+        Args:
+            points (np.ndarray): Array of points (N, 3), where each row is [x, y, z].
+            distance_threshold (float): Distance threshold to identify inliers.
+            
+        Returns:
+            tuple: Coefficients of the fitted model (a, c, d for ax + cz = d) and inliers.
+        """
+        # Extract x and z coordinates
+        x = points[:, 0].reshape(-1, 1)  # Feature (independent variable)
+        z = points[:, 2]  # Target (dependent variable)
+
+        # RANSAC model
+        ransac = RANSACRegressor(
+            residual_threshold=distance_threshold,
+            max_trials=1000
+        )
+        ransac.fit(x, z)
+
+        # Extract model coefficients
+        slope = ransac.estimator_.coef_[0]  # Coefficient for x
+        intercept = ransac.estimator_.intercept_  # Intercept (c)
+
+        # Reconstruct the plane model: ax + cz = d
+        a = slope
+        c = -1.0  # Coefficient for z
+        d = -intercept
+        plane_model = [a, 0.0, c, d]  # Assuming y coefficient is 0
+
+        # Get inliers
+        inlier_mask = ransac.inlier_mask_
+        inliers = np.where(inlier_mask)[0]
+
+        print(f"RANSAC Model: {plane_model}")
+        print(f"Number of Inliers: {len(inliers)}")
+
         return plane_model, inliers
     
     def process_laser_scans(self, data_storage):
@@ -694,7 +772,8 @@ class RobotMovement:
             rot_data = np.array(rot_data)
             
             # Filter points for ransac
-            plane_params, inliers = self.fit_plane_ransac(scan_points)
+            # plane_params, inliers = self.fit_plane_ransac(scan_points, distance_threshold=0.0001, num_iterations=1000)
+            plane_params, inliers = self.fit_ransac_2d(scan_points, distance_threshold=0.0005)
             print(f"shape of scan_points: {np.array(scan_points).shape}")
             
             filtered_points = scan_points[inliers]
@@ -705,6 +784,8 @@ class RobotMovement:
             
             for j, point in enumerate(filtered_points):
                 # Transform points to the world frame
+                print(f"flange trans: {filtered_trans[j]}")
+                break
                 transformed_point = self.transform_single_point_to_world(point, filtered_trans[j], filtered_rot[j])
                 world_points.append(transformed_point) 
                 
@@ -716,6 +797,98 @@ class RobotMovement:
             # print(f"Scan {i + 1}: {world_points[:5]} (Showing first 5 points)")
 
         return points_per_scan
+    
+    def objective_function(self, euler_angles, preprocessed_scans):
+        """
+        Objective function for Euler angle optimization.
+
+        Args:
+            euler_angles (np.ndarray): Current guess for [roll, pitch, yaw] (3,).
+            preprocessed_scans (list): List of inlier points for each scan.
+
+        Returns:
+            float: Total cost (C).
+        """
+        roll, pitch, yaw = euler_angles  # Unpack Euler angles
+        
+        total_cost = 0
+        
+        residuals = []
+        total_transform_points = []
+        total_plane = []
+        
+        for i, inlier_points in enumerate(preprocessed_scans):
+            # Apply the guessed RPY to transform the points
+            transformed_points = self.transform_points_with_euler(inlier_points, roll, pitch, yaw)
+            
+            # Fit a plane to the transformed points
+            A, b = self.construct_linear_system(transformed_points)
+            plane_params = self.solve_plane(A, b)
+            total_transform_points.append(transformed_points)
+            total_plane.append(plane_params)
+            calc_residuals = self.calculate_residuals(A, b, plane_params)
+            total_cost += self.calculate_cost(calc_residuals)
+            residuals.extend(calc_residuals)
+            
+        self.plot_multiple_planes_with_points(total_plane, total_transform_points, margin=0.1, resolution=50)
+        return np.array(residuals)
+    
+    def plot_multiple_planes_with_points(self, plane_params_list, points_list, margin=0.1, resolution=10):
+        """
+        Plot multiple fitted planes and their corresponding points, color-coded for distinction.
+
+        Args:
+            plane_params_list (list): List of plane parameters [[a, b, d], ...] for each scan.
+            points_list (list): List of point arrays [points1, points2, ...], where each is (N, 3).
+            margin (float): Extra margin added to the axis limits (in meters).
+            resolution (int): Number of points in each axis for plane plotting.
+        """
+        # Define a set of distinct colors
+        colors = ['red', 'blue', 'green', 'orange', 'purple', 'cyan', 'magenta', 'yellow']
+
+        # Create a 3D plot
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Initialize axis limits
+        all_points = np.vstack(points_list)  # Combine all points to calculate global bounds
+        min_vals = all_points.min(axis=0)
+        max_vals = all_points.max(axis=0)
+
+        x_min, y_min, z_min = min_vals - margin
+        x_max, y_max, z_max = max_vals + margin
+
+        # Loop through each scan and plot points and planes
+        for i, (plane_params, points) in enumerate(zip(plane_params_list, points_list)):
+            a, b, d = plane_params
+            c = 1  # Since the equation is ax + by + z + d = 0, c is implicitly 1
+
+            # Generate grid points for the plane within the global bounds
+            x = np.linspace(x_min, x_max, resolution)
+            y = np.linspace(y_min, y_max, resolution)
+            xx, yy = np.meshgrid(x, y)
+            zz = -a * xx - b * yy - d  # Compute z values for the plane
+
+            # Plot points for this scan
+            color = colors[i % len(colors)]  # Cycle through colors
+            ax.scatter(points[:, 0], points[:, 1], points[:, 2], color=color, label=f'Scan {i + 1} Points')
+
+            # Plot the plane for this scan
+            ax.plot_surface(xx, yy, zz, alpha=0.3, color=color)
+
+        # Set axis limits based on the global bounds
+        ax.set_xlim([x_min, x_max])
+        ax.set_ylim([y_min, y_max])
+        ax.set_zlim([z_min, z_max])
+
+        # Add labels and legend
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title('Fitted Planes with Points')
+        ax.legend()
+
+        plt.show()
     
 
 if __name__ == '__main__':
@@ -801,12 +974,51 @@ if __name__ == '__main__':
         # print(results)
         # print(f'total cost: {total_cost}')
         
+        # Initial guess for Euler angles (roll, pitch, yaw)
+        initial_euler = np.array([-0.5, -0.4, -0.5])  # No rotation
+
         clean_world_points = robot_movement.preprocess_data(scan_data)
-        print(clean_world_points)
-        # fitted_planes = robot_movement.process_laser_scans(scan_data)
-        # print(f"fitted_planes size: {len(fitted_planes)}")
-        # Display point cloud conversion
-        # print(f"cloud data: {scan_data[0][0].get('point_cloud', None)}")
+        
+        # Define bounds for optimization (e.g., ±π/4 for Euler angles or unconstrained for quaternion)
+        # bounds = [
+        #     (-np.pi / 4, np.pi / 4),  # Roll
+        #     (-np.pi / 4, np.pi / 4),  # Pitch
+        #     (-np.pi / 4, np.pi / 4),  # Yaw
+        # ]
+        bounds = (
+            [-np.pi / 4, -np.pi / 4, -np.pi / 4],  # Lower bounds
+            [np.pi / 4, np.pi / 4, np.pi / 4]      # Upper bounds
+        )
+        
+        # Run optimization
+        # result = minimize(
+        #     fun=robot_movement.objective_function,
+        #     x0=initial_euler,
+        #     args=(clean_world_points,),
+        #     method='trust-constr',
+        #     bounds=bounds,
+        #     options={'verbose': 2},  # For detailed optimization output
+        #     tol=1e-9  # Adjust tolerance for desired precision
+        # )
+        
+        # Call least_squares
+        # result = least_squares(
+        #     fun=robot_movement.objective_function,
+        #     x0=initial_euler,
+        #     args=(clean_world_points,),
+        #     method='trf',  # Trust-region reflective algorithm
+        #     bounds=bounds,  # Specify bounds
+        #     xtol=1e-9,  # Tolerance for termination
+        #     verbose=2  # Detailed output
+        # )
+
+        # # Retrieve optimized Euler angles
+        # optimized_euler = result.x
+        # print(f"Optimized Euler Angles (roll, pitch, yaw): {optimized_euler}")
+        # print("Residual sum of squares:", result.cost)
+
+        robot_movement.objective_function(initial_euler,clean_world_points)
+     
             
     except rospy.ROSInterruptException:
         pass
