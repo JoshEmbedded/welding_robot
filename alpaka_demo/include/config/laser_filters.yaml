@@ -1,0 +1,38 @@
+scan_filter_chain:
+  - name: range
+    type: laser_filters/LaserScanRangeFilter
+    params:
+      use_message_range_limits: true
+      lower_threshold: 0.074
+      upper_threshold: 0.158
+      lower_replacement_value: -.inf
+      upper_replacement_value: .inf
+
+  - name: laser_median_filter
+    type: laser_filters/LaserArrayFilter
+    params:
+      range_filter_chain:
+        - name: median_5
+          type: filters/MultiChannelMedianFilterFloat
+          params:
+            number_of_observations: 100
+      intensity_filter_chain:
+        - name: median_5
+          type: filters/MultiChannelMedianFilterFloat
+          params:
+            number_of_observations: 100
+
+
+  - name: angle
+    type: laser_filters/LaserScanAngularBoundsFilter
+    params:
+      lower_angle: -0.1937
+      upper_angle: 0.1937
+
+  # - name: speckle_filter
+  #   type: laser_filters/LaserScanSpeckleFilter
+  #   params:
+  #     filter_type: 1
+  #     max_range: 2.0
+  #     max_range_difference: 0.01
+  #     filter_window: 3

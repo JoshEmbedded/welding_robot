@@ -2,7 +2,7 @@ import sys  # Add this import to resolve the NameError
 import rospy
 import moveit_commander
 import tf
-from sensor_msgs.msg import LaserScan, PointCloud2, PointCloud
+from sensor_msgs.msg import LaserScan, PointCloud2, PointField
 from geometry_msgs.msg import PoseStamped, Pose
 import math
 import tf.transformations as tft
@@ -15,6 +15,8 @@ import rosbag
 from tf2_msgs.msg import TFMessage
 import roslib; roslib.load_manifest('laser_assembler')
 from laser_assembler.srv import *
+import sensor_msgs.point_cloud2 as pc2
+
 
 class RobotMovement:
     def __init__(self):
@@ -77,8 +79,8 @@ class RobotMovement:
         """ Callback to store LaserScan data in the rosbag """
         self.latest_scan = msg
         
-        if self.scanning:
-            self.record_data()
+        # if self.scanning:
+        #     self.record_data()
 
     def get_flange_position(self):
         try:
@@ -180,6 +182,7 @@ class RobotMovement:
         return new_pose
 
 def pointCloud_assemble(start_time, end_time):
+    resp = None
     try:
             rospy.wait_for_service('assemble_scans2')  # Ensure service is available
             assemble_scans2 = rospy.ServiceProxy('assemble_scans2', AssembleScans2)
@@ -199,6 +202,27 @@ def pointCloud_assemble(start_time, end_time):
                 
     except rospy.ServiceException as e:
             rospy.logerr("Service call failed: %s", e)
+            
+    return resp
+            
+def merge_pointclouds(cloud1, cloud2):
+    """ Merges two PointCloud2 messages into one while preserving all fields. """
+
+    # Extract all field names dynamically
+    field_names = [f.name for f in cloud1.fields]
+
+    # Extract points from both clouds
+    points1 = list(pc2.read_points(cloud1, field_names=field_names, skip_nans=True))
+    points2 = list(pc2.read_points(cloud2, field_names=field_names, skip_nans=True))
+
+    # Merge the point lists
+    merged_points = points1 + points2
+
+    # Create a new PointCloud2 message
+    merged_cloud = pc2.create_cloud(cloud1.header, cloud1.fields, merged_points)
+    merged_cloud.header.stamp = rospy.Time.now()  # Update timestamp
+
+    return merged_cloud
 
 if __name__ == '__main__':
     try:
@@ -221,13 +245,13 @@ if __name__ == '__main__':
         pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -1.57)
         # Move robot asynchronously (non-blocking)
         robot_movement.move_robot(pose, True)
-        robot_movement.group.set_max_velocity_scaling_factor(0.1)
-        robot_movement.group.set_max_acceleration_scaling_factor(0.1)
+        robot_movement.group.set_max_velocity_scaling_factor(0.05)
+        robot_movement.group.set_max_acceleration_scaling_factor(0.05)
         
-        first_movement = robot_movement.offset_movement(pose, 0, 0.1, 0, 0, 0, 0)
+        first_movement = robot_movement.offset_movement(pose, 0, 0.10, 0, 0, 0, 0)
         
         second_movement = robot_movement.offset_movement(first_movement, 0, 0, 0, 0, 0, 3.14)
-        third_movement = robot_movement.offset_movement(second_movement, 0, -0.1, 0, 0, 0, 0)
+        third_movement = robot_movement.offset_movement(second_movement, 0, -0.2, 0, 0, 0, 0)
         robot_movement.scanning = True
         
         
@@ -237,7 +261,7 @@ if __name__ == '__main__':
         end_time = rospy.get_rostime()
         robot_movement.scanning = False
         
-        pointCloud_assemble(start_time, end_time)
+        resp1 = pointCloud_assemble(start_time, end_time)
         
         robot_movement.move_robot(second_movement, True)
         
@@ -247,7 +271,22 @@ if __name__ == '__main__':
         robot_movement.scanning = False
         end_time = rospy.get_rostime()
         
-        pointCloud_assemble(start_time, end_time)
+        resp2 = pointCloud_assemble(start_time, end_time)
+        
+        if len(resp1.cloud.data) > 0 and len(resp2.cloud.data) > 0:
+            rospy.loginfo("Merging two point clouds...")
+
+            # Merge the two clouds
+            merged_cloud = merge_pointclouds(resp1.cloud, resp2.cloud)
+
+            # Publish the merged cloud
+            rospy.loginfo(f"Publishing merged PointCloud2 with {len(merged_cloud.data)} bytes of data.")
+            robot_movement.cloud_pub.publish(merged_cloud)
+            rospy.loginfo("Published merged PointCloud2 successfully.")
+
+        else:
+            rospy.logwarn("One of the clouds is empty! Check laser scan topic and TF frames.")
+
         
         rospy.sleep(0.1)
         
