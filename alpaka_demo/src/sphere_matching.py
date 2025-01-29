@@ -229,64 +229,78 @@ if __name__ == '__main__':
         # Create an instance of RobotMovement
         robot_movement = RobotMovement()
         
-        # orientations = []
-        # square_pose_list = []
+        orientations = []
+        point_clouds = []
         
+        bag = rosbag.Bag('cloud.bag', 'w')
 
         # Create a target pose for the robot (example)
         pose = Pose()
-        pose.position.x = 0.0
-        pose.position.y = 0.35
+        pose.position.x = -0.02
+        pose.position.y = 0.40
         pose.position.z = 0.055
         pose.orientation.x = 1.0
         pose.orientation.y = 0.0
         pose.orientation.z = 0.0
         pose.orientation.w = 0.0
         pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -1.57)
+        second_viewing_angle = robot_movement.offset_movement(pose, 0, 0, 0, 0.7, 0, 0)
+        third_viewing_angle = robot_movement.offset_movement(pose, 0.040, 0, 0, -0.7, 0, 0)
+        fourth_viewing_angle = robot_movement.offset_movement(pose, 0.02, 0, 0, 0, 0.7, 0)
+        fifth_viewing_angle = robot_movement.offset_movement(pose, 0.02, 0, 0, 0, -0.7, 0)
+        orientations = np.array([pose, second_viewing_angle, third_viewing_angle, fourth_viewing_angle, fifth_viewing_angle])
+        
+        
         # Move robot asynchronously (non-blocking)
-        robot_movement.move_robot(pose, True)
-        robot_movement.group.set_max_velocity_scaling_factor(0.05)
-        robot_movement.group.set_max_acceleration_scaling_factor(0.05)
-        
-        first_movement = robot_movement.offset_movement(pose, 0, 0.10, 0, 0, 0, 0)
-        
-        second_movement = robot_movement.offset_movement(first_movement, 0, 0, 0, 0, 0, 3.14)
-        third_movement = robot_movement.offset_movement(second_movement, 0, -0.2, 0, 0, 0, 0)
-        robot_movement.scanning = True
-        
-        
-        start_time = rospy.get_rostime()
-        # Initial testing of movement and bag
-        robot_movement.move_robot(first_movement, True)
-        end_time = rospy.get_rostime()
-        robot_movement.scanning = False
-        
-        resp1 = pointCloud_assemble(start_time, end_time)
-        
-        robot_movement.move_robot(second_movement, True)
-        
-        start_time = rospy.get_rostime()
-        robot_movement.scanning = True
-        robot_movement.move_robot(third_movement, True)
-        robot_movement.scanning = False
-        end_time = rospy.get_rostime()
-        
-        resp2 = pointCloud_assemble(start_time, end_time)
-        
-        if len(resp1.cloud.data) > 0 and len(resp2.cloud.data) > 0:
-            rospy.loginfo("Merging two point clouds...")
+        for (i, pose_n) in enumerate(orientations):
+            robot_movement.move_robot(pose_n, True)
+            robot_movement.group.set_max_velocity_scaling_factor(0.05)
+            robot_movement.group.set_max_acceleration_scaling_factor(0.05)
+            
+            first_movement = robot_movement.offset_movement(pose_n, 0, 0.10, 0, 0, 0, 0)
+            second_movement = robot_movement.offset_movement(first_movement, 0, -0.10, 0, 0, 0, 0)
+            robot_movement.scanning = True
+            
+            
+            start_time = rospy.get_rostime()
+            # Initial testing of movement and bag
+            robot_movement.move_robot(first_movement, True)
+            end_time = rospy.get_rostime()
+            robot_movement.scanning = False
+            
+            resp1 = pointCloud_assemble(start_time, end_time)
+            
+            if i == 0:
+                robot_movement.move_robot(robot_movement.offset_movement(first_movement, 0.04,0,0,0,0,0), True)
+            
+            start_time = rospy.get_rostime()
+            robot_movement.scanning = True
+            robot_movement.move_robot(second_movement, True)
+            robot_movement.scanning = False
+            end_time = rospy.get_rostime()
+            
+            resp2 = pointCloud_assemble(start_time, end_time)
+            
+            if len(resp1.cloud.data) > 0 and len(resp2.cloud.data) > 0:
+                rospy.loginfo("Merging two point clouds...")
 
-            # Merge the two clouds
-            merged_cloud = merge_pointclouds(resp1.cloud, resp2.cloud)
+                # Merge the two clouds
+                merged_cloud = merge_pointclouds(resp1.cloud, resp2.cloud)
+                point_clouds.append(merged_cloud)
+                try:
+                    bag.write("/cloud_data", merged_cloud, rospy.Time.now())
+                except Exception as e:
+                    rospy.logerr(f"Error writing data to rosbag: {e}")
+                # Publish the merged cloud
+                rospy.loginfo(f"Publishing merged PointCloud2 with {len(merged_cloud.data)} bytes of data.")
+                robot_movement.cloud_pub.publish(merged_cloud)
+                rospy.loginfo("Published merged PointCloud2 successfully.")
+                
 
-            # Publish the merged cloud
-            rospy.loginfo(f"Publishing merged PointCloud2 with {len(merged_cloud.data)} bytes of data.")
-            robot_movement.cloud_pub.publish(merged_cloud)
-            rospy.loginfo("Published merged PointCloud2 successfully.")
-
-        else:
-            rospy.logwarn("One of the clouds is empty! Check laser scan topic and TF frames.")
-
+            else:
+                rospy.logwarn("One of the clouds is empty! Check laser scan topic and TF frames.")
+        
+        bag.close()
         
         rospy.sleep(0.1)
         
