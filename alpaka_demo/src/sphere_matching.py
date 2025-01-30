@@ -224,6 +224,18 @@ def merge_pointclouds(cloud1, cloud2):
 
     return merged_cloud
 
+def ros_pointcloud2_to_open3d(ros_cloud):
+    """ Convert ROS sensor_msgs/PointCloud2 to Open3D point cloud. """
+    points_list = []
+
+    for point in pc2.read_points(ros_cloud, field_names=("x", "y", "z"), skip_nans=True):
+        points_list.append([point[0], point[1], point[2]])
+
+    # Convert to Open3D format
+    cloud = o3d.geometry.PointCloud()
+    cloud.points = o3d.utility.Vector3dVector(np.array(points_list, dtype=np.float32))
+    return cloud
+
 if __name__ == '__main__':
     try:
         # Create an instance of RobotMovement
@@ -233,6 +245,8 @@ if __name__ == '__main__':
         point_clouds = []
         
         bag = rosbag.Bag('cloud.bag', 'w')
+        
+        scan_files = ["scan_1.pcd", "scan_2.pcd", "scan_3.pcd", "scan_4.pcd", "scan_5.pcd"]  # List of individual scans
 
         # Create a target pose for the robot (example)
         pose = Pose()
@@ -244,10 +258,10 @@ if __name__ == '__main__':
         pose.orientation.z = 0.0
         pose.orientation.w = 0.0
         pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -1.57)
-        second_viewing_angle = robot_movement.offset_movement(pose, 0, 0, 0, 0.7, 0, 0)
-        third_viewing_angle = robot_movement.offset_movement(pose, 0.040, 0, 0, -0.7, 0, 0)
-        fourth_viewing_angle = robot_movement.offset_movement(pose, 0.02, 0, 0, 0, 0.7, 0)
-        fifth_viewing_angle = robot_movement.offset_movement(pose, 0.02, 0, 0, 0, -0.7, 0)
+        second_viewing_angle = robot_movement.offset_movement(pose, -0.0, 0, 0, 0.7, 0, 0)
+        third_viewing_angle = robot_movement.offset_movement(pose, 0.060, 0, 0, -0.7, 0, 0)
+        fourth_viewing_angle = robot_movement.offset_movement(pose, 0.02, 0, 0.01, 0, 0.7, 0)
+        fifth_viewing_angle = robot_movement.offset_movement(pose, 0.02, 0, -0.02, 0, -0.7, 0)
         orientations = np.array([pose, second_viewing_angle, third_viewing_angle, fourth_viewing_angle, fifth_viewing_angle])
         
         
@@ -257,8 +271,8 @@ if __name__ == '__main__':
             robot_movement.group.set_max_velocity_scaling_factor(0.05)
             robot_movement.group.set_max_acceleration_scaling_factor(0.05)
             
-            first_movement = robot_movement.offset_movement(pose_n, 0, 0.10, 0, 0, 0, 0)
-            second_movement = robot_movement.offset_movement(first_movement, 0, -0.10, 0, 0, 0, 0)
+            first_movement = robot_movement.offset_movement(pose_n, 0, 0.15, 0, 0, 0, 0)
+            second_movement = robot_movement.offset_movement(first_movement, 0, -0.15, 0, 0, 0, 0)
             robot_movement.scanning = True
             
             
@@ -272,6 +286,7 @@ if __name__ == '__main__':
             
             if i == 0:
                 robot_movement.move_robot(robot_movement.offset_movement(first_movement, 0.04,0,0,0,0,0), True)
+                second_movement = robot_movement.offset_movement(pose_n, 0.02, 0, 0, 0, 0, 0)
             
             start_time = rospy.get_rostime()
             robot_movement.scanning = True
@@ -287,6 +302,11 @@ if __name__ == '__main__':
                 # Merge the two clouds
                 merged_cloud = merge_pointclouds(resp1.cloud, resp2.cloud)
                 point_clouds.append(merged_cloud)
+                
+                # Write point cloud data to file:
+                pcd = ros_pointcloud2_to_open3d(merged_cloud)
+                o3d.io.write_point_cloud(scan_files[i], pcd)
+    
                 try:
                     bag.write("/cloud_data", merged_cloud, rospy.Time.now())
                 except Exception as e:
@@ -301,6 +321,14 @@ if __name__ == '__main__':
                 rospy.logwarn("One of the clouds is empty! Check laser scan topic and TF frames.")
         
         bag.close()
+        
+        total_cloud = None
+        for i in range(len(point_clouds)-1):
+            total_cloud = merge_pointclouds(point_clouds[i], point_clouds[i+1])
+            point_clouds[i+1] = total_cloud
+        
+        robot_movement.cloud_pub.publish(total_cloud)
+                
         
         rospy.sleep(0.1)
         
