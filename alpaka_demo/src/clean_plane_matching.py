@@ -193,6 +193,17 @@ class RobotMovement:
         point_hom = np.append(point, 1.0)
         return np.dot(transform_matrix, point_hom)[:3]
     
+    def transform_points_to_world(self, flange_world_transform, sensor_flange_transform, points):
+        
+        sensor_world_transform = np.dot(flange_world_transform, sensor_flange_transform)
+        
+        # Convert points to homogeneous coordinates (Nx4)
+        points_hom = np.hstack((points, np.ones((points.shape[0], 1))))  # Add 1 as the 4th dimension
+        
+        points_world_frame = np.dot(sensor_world_transform, points_hom.T)
+        
+        return points_world_frame.T[:,:3]
+    
     def transform_points_with_euler(self, points, roll, pitch, yaw):
         """
         Transform points using Euler angles (roll, pitch, yaw).
@@ -213,43 +224,108 @@ class RobotMovement:
         transformed_points = np.dot(points, rotation_matrix.T)
     
         return np.array(transformed_points)
+    
+    def make_homogeneous_transform_from_euler(self, euler_angles):
+        """
+        Constructs a 4x4 homogeneous transformation matrix from Euler angles.
+
+        :param euler_angles: (roll, pitch, yaw) Euler angles in radians (list or NumPy array of shape (3,))
+        :return: 4x4 homogeneous transformation matrix (NumPy array)
+        """
+        # Convert Euler angles to 4x4 homogeneous rotation matrix
+        transformation_matrix = tft.euler_matrix(euler_angles[0], euler_angles[1], euler_angles[2])
+
+        return transformation_matrix
+    
+    def make_homogeneous_transform(self, translation, quaternion):
+        """
+        Constructs a 4x4 homogeneous transformation matrix from translation and quaternion.
+
+        :param translation: (x, y, z) translation vector (list or NumPy array of shape (3,))
+        :param quaternion: (x, y, z, w) quaternion (list or NumPy array of shape (4,))
+        :return: 4x4 homogeneous transformation matrix (NumPy array)
+        """
+        # Convert quaternion to 3x3 rotation matrix
+        rotation_matrix = tft.quaternion_matrix(quaternion)[:3, :3]
+
+        # Construct the homogeneous transformation matrix
+        transformation_matrix = np.eye(4)  # Start with identity matrix
+        transformation_matrix[:3, :3] = rotation_matrix  # Set rotation
+        transformation_matrix[:3, 3] = translation  # Set translation
+
+        return transformation_matrix
 
     # ======================== DATA PROCESSING ======================== #
 
-    def preprocess_data(self, data):
+    # def preprocess_data(self, data):
+    #     """Preprocess laser scan data and filter outliers."""
+    #     processed_scans = []
+    #     for i, scan_pass in enumerate(data):
+    #         print(f"Processing scan pass: {i+1}.")
+    #         scan_points = []
+    #         trans_data, rot_data = [], []
+
+    #         for scan in scan_pass:
+    #             laser_scan = scan['laser_scan']
+    #             trans, rot = scan['trans'], scan['rot']
+    #             sensor_points = self.laser_scan_to_points(laser_scan)
+    #             scan_points.extend(sensor_points)
+    #             trans_data.extend([trans] * len(sensor_points))
+    #             rot_data.extend([rot] * len(sensor_points))
+
+    #         scan_points = np.array(scan_points)
+    #         trans_data, rot_data = np.array(trans_data), np.array(rot_data)
+
+    #         plane_params, inliers = self.fit_ransac_2d(scan_points, distance_threshold=0.005)
+    #         filtered_points = scan_points[inliers]
+    #         filtered_rot_data = rot_data[inliers]
+    #         filtered_trans_data = trans_data[inliers]
+    #         world_points = np.array([self.transform_single_point_to_world(p, filtered_trans_data[i], filtered_rot_data[i]) for i, p in enumerate(filtered_points)])
+
+    #         processed_scans.append(world_points)
+    #     return processed_scans
+    
+    def preprocess_data(self, data, sensor_flange_transform):
         """Preprocess laser scan data and filter outliers."""
         processed_scans = []
         for i, scan_pass in enumerate(data):
-            print(f"Processing scan pass: {i+1}.")
-            scan_points = []
-            trans_data, rot_data = [], []
+            # print(f"Processing scan pass: {i+1}.")
+            world_points = []
 
             for scan in scan_pass:
                 laser_scan = scan['laser_scan']
                 trans, rot = scan['trans'], scan['rot']
                 sensor_points = self.laser_scan_to_points(laser_scan)
-                scan_points.extend(sensor_points)
-                trans_data.extend([trans] * len(sensor_points))
-                rot_data.extend([rot] * len(sensor_points))
-
-            scan_points = np.array(scan_points)
-            trans_data, rot_data = np.array(trans_data), np.array(rot_data)
-
-            plane_params, inliers = self.fit_ransac_2d(scan_points, distance_threshold=0.001)
-            filtered_points = scan_points[inliers]
-            world_points = np.array([self.transform_single_point_to_world(p, trans_data[i], rot_data[i]) for i, p in enumerate(filtered_points)])
+                flange_world_trans = self.make_homogeneous_transform(trans, rot)
+                world_points.extend(self.transform_points_to_world(flange_world_trans, sensor_flange_transform, sensor_points))
+                
+            world_points = np.array(world_points)
 
             processed_scans.append(world_points)
+            
         return processed_scans
 
     def fit_ransac_2d(self, points, distance_threshold=0.001):
-        """Perform RANSAC regression on 2D data."""
-        x = points[:, 0].reshape(-1, 1)
-        y = points[:, 1].reshape(-1, 1)
+        """Perform RANSAC regression on 2D data in the X-Y plane."""
+        x = points[:, 0].reshape(-1, 1)  # X as independent variable
+        y = points[:, 1].reshape(-1, 1)  # Y as dependent variable
+
+        print(f"Initial number of data points: {len(points)}")
+
         ransac = RANSACRegressor(residual_threshold=distance_threshold, max_trials=1000)
-        ransac.fit(x, y)
-        a, d = ransac.estimator_.coef_[0], -ransac.estimator_.intercept_
-        return [a, -1, 0, d], np.where(ransac.inlier_mask_)[0]
+        ransac.fit(x, y)  # Fit Y as a function of X
+
+        a = ransac.estimator_.coef_[0][0]  # Slope (dy/dx)
+        d = ransac.estimator_.intercept_[0]  # Intercept
+
+        inlier_mask = ransac.inlier_mask_
+        inlier_count = np.sum(inlier_mask)
+
+        print(f"Number of inliers after RANSAC filtering: {inlier_count}")
+        print(f"Percentage of inliers retained: {100 * inlier_count / len(points):.2f}%")
+
+        # Return equation in the form ax + by + d = 0 (b= -1 for y = ax + d)
+        return [a, -1, 0, d], np.where(inlier_mask)[0]
     
     # ====================== LINEAR EQUATIONS ====================== #
     
@@ -263,9 +339,9 @@ class RobotMovement:
         Returns:
             tuple: A matrix (N, 3), b vector (N,).
         """
-        A = points[:, [1,2]]  # Use y and z for A
+        A = points[:, [0,1]]  # Use x and y for A
         A = np.hstack((A, np.ones((A.shape[0], 1))))  # Add the constant column for d
-        b = points[:, 0]  # Use x for b
+        b = points[:, 2]  # Use z for c
         return A, b
 
     def solve_plane(self, A, b):
@@ -295,7 +371,7 @@ class RobotMovement:
         Returns:
             np.ndarray: Residuals for each data point.
         """
-        predicted_b = np.dot(A, plane_params)  # Predicted z values
+        predicted_b = np.dot(A, plane_params)  # Predicted x values
         residuals = b - predicted_b  # Calculate residuals
         return residuals
     
@@ -317,7 +393,45 @@ class RobotMovement:
         # Take the square root of the sum
         return math.sqrt(cost)
     
-    def objective_function(self, euler_angles, preprocessed_scans, counter):
+    # def objective_function(self, euler_angles, preprocessed_scans, counter):
+    #     """
+    #     Objective function for Euler angle optimization.
+
+    #     Args:
+    #         euler_angles (np.ndarray): Current guess for [roll, pitch, yaw] (3,).
+    #         preprocessed_scans (list): List of inlier points for each scan.
+
+    #     Returns:
+    #         float: Total cost (C).
+    #     """
+    #     roll, pitch, yaw = euler_angles  # Unpack Euler angles
+        
+    #     total_cost = 0
+        
+    #     residuals = []
+    #     total_transform_points = []
+    #     total_plane = []
+        
+    #     for i, inlier_points in enumerate(preprocessed_scans):
+    #         # Apply the guessed RPY to transform the points
+    #         transformed_points = self.transform_points_with_euler(inlier_points, roll, pitch, yaw)
+            
+    #         # Fit a plane to the transformed points
+    #         A, b = self.construct_linear_system(transformed_points)
+    #         plane_params = self.solve_plane(A, b)
+    #         total_transform_points.append(transformed_points)
+    #         total_plane.append(plane_params)
+    #         calc_residuals = self.calculate_residuals(A, b, plane_params)
+    #         total_cost += self.calculate_cost(calc_residuals)
+    #         residuals.extend(calc_residuals)
+            
+    #     # if not counter % 10:
+    #     #     self.plot_multiple_planes_with_points(total_plane, total_transform_points, margin=0.1, resolution=50)
+    #     # return np.array(residuals)
+    #     # counter += 1
+    #     return total_cost
+    
+    def objective_function(self, euler_angles, data, counter):
         """
         Objective function for Euler angle optimization.
 
@@ -336,10 +450,13 @@ class RobotMovement:
         total_transform_points = []
         total_plane = []
         
-        for i, inlier_points in enumerate(preprocessed_scans):
+        sens_flange_trans = self.make_homogeneous_transform_from_euler(euler_angles)
+        
+        converted_data = self.preprocess_data(data, sens_flange_trans)
+        
+        for i, transformed_points in enumerate(converted_data):
             # Apply the guessed RPY to transform the points
-            transformed_points = self.transform_points_with_euler(inlier_points, roll, pitch, yaw)
-            
+                        
             # Fit a plane to the transformed points
             A, b = self.construct_linear_system(transformed_points)
             plane_params = self.solve_plane(A, b)
@@ -350,12 +467,13 @@ class RobotMovement:
             residuals.extend(calc_residuals)
             
         # if not counter % 10:
-        #     # self.plot_multiple_planes_with_points(total_plane, total_transform_points, margin=0.1, resolution=50)
-        # # return np.array(residuals)
+        self.plot_multiple_planes_with_points(total_plane, converted_data, margin=0.1, resolution=50)
+        # return np.array(residuals)
         # counter += 1
         return total_cost
-    
+        
     # ============ PLANE & POINT PLOTTING (optional) =================== #
+    
     def plot_multiple_planes_with_points(self, plane_params_list, points_list, margin=0.1, resolution=10):
         """
         Plot multiple fitted planes and their corresponding points, color-coded for distinction.
@@ -383,14 +501,16 @@ class RobotMovement:
 
         # Loop through each scan and plot points and planes
         for i, (plane_params, points) in enumerate(zip(plane_params_list, points_list)):
-            a, c, d = plane_params
-            b = 1.0  # Since the equation is ax + by + z + d = 0, c is implicitly 1
-
+            
+            a, b, d = plane_params
+            
             # Generate grid points for the plane within the global bounds
             x = np.linspace(x_min, x_max, resolution)
             y = np.linspace(y_min, y_max, resolution)
             xx, yy = np.meshgrid(x, y)
-            zz = (d - a * xx - b * yy) / c  # Rearrange the plane equation for z
+           
+            # Compute xx based on the plane equation x = b*y + c*z + d
+            zz = a * xx + b * yy + d
 
             # Plot points for this scan
             color = colors[i % len(colors)]  # Cycle through colors
@@ -514,7 +634,7 @@ def optimise_rotation():
         scan_data = pickle.load(f)
 
     # Process data before optimization
-    clean_world_points = robot_movement.preprocess_data(scan_data)
+    # clean_world_points = robot_movement.preprocess_data(scan_data)
 
     # Initial guess for Euler angles (roll, pitch, yaw)
     initial_euler = np.array([0.01, 0.01, -0.01])
@@ -533,12 +653,13 @@ def optimise_rotation():
     result = minimize(
         fun=robot_movement.objective_function,
         x0=initial_euler,
-        args=(clean_world_points, counter),
+        args=(scan_data, counter),
         method='trust-constr',
         bounds=bounds,
-        options={'verbose': 2, 'maxiter': 5000},  
-        tol=1e-9,
+        options={'verbose': 2, 'maxiter': 5000, 'gtol':1e-6},  
+        tol=1e-7,
     )
+    # result = robot_movement.objective_function(initial_euler, clean_world_points, counter)
 
     optimized_euler = result.x
     print(f"Optimized Euler Angles (roll, pitch, yaw): {optimized_euler}")
@@ -550,7 +671,7 @@ if __name__ == '__main__':
         robot_movement = RobotMovement()
 
         # Collect data
-        scan_data = collect_data(robot_movement)
+        # scan_data = collect_data(robot_movement)
 
         # # Optimise rotation
         optimise_rotation()
