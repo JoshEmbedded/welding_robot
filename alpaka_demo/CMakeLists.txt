@@ -57,13 +57,13 @@ catkin_install_python(PROGRAMS
   src/laser_calibration.py
   src/transformCalculation.py
   src/servo_test.py
-  src/restrict_scan.py
   src/tf_scan_test.py
   src/y_rot_test.py
   src/plane_matching.py
   src/sphere_matching.py
   src/plane_segmentation.py
   src/clean_plane_matching.py
+  src/clean_sphere_matching.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
