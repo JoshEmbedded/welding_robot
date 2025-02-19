@@ -146,9 +146,8 @@ class RobotMovement:
     def laser_scan_callback(self, msg):
         """Callback function for laser scan data."""
         self.latest_scan = msg
-        if self.scanning and self.counter < 100:
+        if self.scanning:
             self.record_data()
-            self.counter += 1
             self.rate.sleep()
 
     def record_data(self):
@@ -161,7 +160,6 @@ class RobotMovement:
                     'trans': copy.deepcopy(self.latest_flange_position),
                     'rot': copy.deepcopy(self.latest_flange_rotation)
                 })
-                # rospy.loginfo(f"Recorded data: trans={self.latest_flange_position}, rot={self.latest_flange_rotation}")
             else:
                 rospy.logwarn("Missing laser scan data or flange position.")
 
@@ -179,12 +177,12 @@ class RobotMovement:
 
     # ======================== TRANSFORMATIONS ======================== #
 
-    def transform_points_to_world(self, points, trans, rot):
-        """Transform 3D points from sensor frame to world frame using flange transform."""
-        transform_matrix = tf.transformations.quaternion_matrix(rot)
-        transform_matrix[:3, 3] = trans
-        world_points = np.dot(transform_matrix[:3, :3], points.T).T + trans
-        return world_points
+    # def transform_points_to_world(self, points, trans, rot):
+    #     """Transform 3D points from sensor frame to world frame using flange transform."""
+    #     transform_matrix = tf.transformations.quaternion_matrix(rot)
+    #     transform_matrix[:3, 3] = trans
+    #     world_points = np.dot(transform_matrix[:3, :3], points.T).T + trans
+    #     return world_points
 
     def transform_single_point_to_world(self, point, trans, rot):
         """Transform a single point from sensor frame to world frame."""
@@ -393,44 +391,6 @@ class RobotMovement:
         # Take the square root of the sum
         return math.sqrt(cost)
     
-    # def objective_function(self, euler_angles, preprocessed_scans, counter):
-    #     """
-    #     Objective function for Euler angle optimization.
-
-    #     Args:
-    #         euler_angles (np.ndarray): Current guess for [roll, pitch, yaw] (3,).
-    #         preprocessed_scans (list): List of inlier points for each scan.
-
-    #     Returns:
-    #         float: Total cost (C).
-    #     """
-    #     roll, pitch, yaw = euler_angles  # Unpack Euler angles
-        
-    #     total_cost = 0
-        
-    #     residuals = []
-    #     total_transform_points = []
-    #     total_plane = []
-        
-    #     for i, inlier_points in enumerate(preprocessed_scans):
-    #         # Apply the guessed RPY to transform the points
-    #         transformed_points = self.transform_points_with_euler(inlier_points, roll, pitch, yaw)
-            
-    #         # Fit a plane to the transformed points
-    #         A, b = self.construct_linear_system(transformed_points)
-    #         plane_params = self.solve_plane(A, b)
-    #         total_transform_points.append(transformed_points)
-    #         total_plane.append(plane_params)
-    #         calc_residuals = self.calculate_residuals(A, b, plane_params)
-    #         total_cost += self.calculate_cost(calc_residuals)
-    #         residuals.extend(calc_residuals)
-            
-    #     # if not counter % 10:
-    #     #     self.plot_multiple_planes_with_points(total_plane, total_transform_points, margin=0.1, resolution=50)
-    #     # return np.array(residuals)
-    #     # counter += 1
-    #     return total_cost
-    
     def objective_function(self, euler_angles, data, counter):
         """
         Objective function for Euler angle optimization.
@@ -446,14 +406,12 @@ class RobotMovement:
         
         total_cost = 0
         
-        residuals = []
-        total_transform_points = []
-        total_plane = []
-        
         sens_flange_trans = self.make_homogeneous_transform_from_euler(euler_angles)
         
         converted_data = self.preprocess_data(data, sens_flange_trans)
-        
+        total_transform_points = []
+        total_plane = []
+    
         for i, transformed_points in enumerate(converted_data):
             # Apply the guessed RPY to transform the points
                         
@@ -464,12 +422,10 @@ class RobotMovement:
             total_plane.append(plane_params)
             calc_residuals = self.calculate_residuals(A, b, plane_params)
             total_cost += self.calculate_cost(calc_residuals)
-            residuals.extend(calc_residuals)
+        
+        ## Plotting function of data and plane
+        # self.plot_multiple_planes_with_points(total_plane, total_transform_points, margin=0.1, resolution=50)
             
-        # if not counter % 10:
-        self.plot_multiple_planes_with_points(total_plane, converted_data, margin=0.1, resolution=50)
-        # return np.array(residuals)
-        # counter += 1
         return total_cost
         
     # ============ PLANE & POINT PLOTTING (optional) =================== #
@@ -543,7 +499,7 @@ def collect_data(robot_movement):
 
         # Create a target pose for the robot
         pose = Pose()
-        pose.position.x = 0.0
+        pose.position.x = -0.075
         pose.position.y = 0.35
         pose.position.z = 0.055
         pose.orientation.x = 1.0
@@ -561,23 +517,23 @@ def collect_data(robot_movement):
 
         # Generate different rotated orientations
         orientations.append(pose)
-        x_neg_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, -0.8, 0, 0)  # Rotation around X
+        x_neg_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, -0.2, 0, 0)  # Rotation around X
         orientations.append(x_neg_rot_pose)
-        y_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0.8, 0)  # Rotation around Y
+        y_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0.2, 0)  # Rotation around Y
         orientations.append(y_rot_pose)
-        z_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, 0.9)  # Rotation around Z
+        z_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, 0.3)  # Rotation around Z
         orientations.append(z_rot_pose)
-        x_pos_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0.8, 0, 0)  # Rotation around X
+        x_pos_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0.2, 0, 0)  # Rotation around X
         orientations.append(x_pos_rot_pose)
-        y_neg_rot_pose = robot_movement.offset_movement(pose, 0, 0, -0.02, 0, -0.3, 0)  # Rotation around Y
+        y_neg_rot_pose = robot_movement.offset_movement(pose, 0, 0, -0.02, 0, -0.2, 0)  # Rotation around Y
         orientations.append(y_neg_rot_pose)
-        z_neg_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -0.9)  # Rotation around Z
+        z_neg_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -0.3)  # Rotation around Z
         orientations.append(z_neg_rot_pose)
-        xy_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, -0.4, 0.4, 0)  # Rotation around X
+        xy_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, -0.15, 0.15, 0)  # Rotation around X & Y
         orientations.append(xy_rot_pose)
-        yz_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, -0.3, 0.2)  # Rotation around Y
+        yz_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, -0.3, 0.2)  # Rotation around Y & Z
         orientations.append(yz_rot_pose)
-        xz_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0.3, 0, -0.3)  # Rotation around Z
+        xz_rot_pose = robot_movement.offset_movement(pose, 0, 0, 0, 0.3, 0, -0.3)  # Rotation around X & Z
         orientations.append(xz_rot_pose)
 
         # Create square movement paths for each orientation
@@ -633,11 +589,8 @@ def optimise_rotation():
     with open("scan_data.pkl", "rb") as f:
         scan_data = pickle.load(f)
 
-    # Process data before optimization
-    # clean_world_points = robot_movement.preprocess_data(scan_data)
-
     # Initial guess for Euler angles (roll, pitch, yaw)
-    initial_euler = np.array([0.01, 0.01, -0.01])
+    initial_euler = np.array([0.01, 0.01, 0.01])
 
     # Define search bounds for optimization
     global_lower_bound = -2 * np.pi
@@ -659,7 +612,6 @@ def optimise_rotation():
         options={'verbose': 2, 'maxiter': 5000, 'gtol':1e-6},  
         tol=1e-7,
     )
-    # result = robot_movement.objective_function(initial_euler, clean_world_points, counter)
 
     optimized_euler = result.x
     print(f"Optimized Euler Angles (roll, pitch, yaw): {optimized_euler}")
@@ -671,7 +623,7 @@ if __name__ == '__main__':
         robot_movement = RobotMovement()
 
         # Collect data
-        # scan_data = collect_data(robot_movement)
+        scan_data = collect_data(robot_movement)
 
         # # Optimise rotation
         optimise_rotation()
