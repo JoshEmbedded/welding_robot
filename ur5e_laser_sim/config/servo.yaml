@@ -1,0 +1,17 @@
+move_group_name: "manipulator"          # Name of your MoveIt group
+planning_frame: "base_link"            # Robot's base frame
+ee_frame_name: "tcp_eff"                 # Robot's end-effector frame
+command_in_type: "unitless"            # Specify command type (e.g., "unitless" or "speed_units")
+cartesian_command_in_topic: "/servo_server/delta_twist_cmds"  # Cartesian input topic
+joint_command_in_topic: "/servo_server/delta_joint_cmds"      # Joint input topic
+
+publish_period: 0.01                  # Servo control loop period (seconds)
+low_latency_mode: true                # Enable for low latency control
+scale_linear: 0.2                     # Scale for Cartesian linear commands
+scale_angular: 0.5                    # Scale for Cartesian angular commands
+scale_joint: 1.0                      # Scale for joint commands
+
+collision_check_rate: 10.0            # Collision check rate (Hz)
+move_group_namespace: ""              # Namespace for move group node
+
+incoming_command_timeout: 0.2         # Time before stopping on no command

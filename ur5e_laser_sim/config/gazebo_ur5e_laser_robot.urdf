@@ -99,36 +99,47 @@
     <transmission name="shoulder_pan_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <joint name="shoulder_pan_joint">
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </joint>
         <actuator name="shoulder_pan_motor">
             <mechanicalReduction>1</mechanicalReduction>
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </actuator>
     </transmission>
     <transmission name="shoulder_lift_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <joint name="shoulder_lift_joint">
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface>
+            <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </joint>
         <actuator name="shoulder_lift_motor">
             <mechanicalReduction>1</mechanicalReduction>
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </actuator>
     </transmission>
     <transmission name="elbow_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <joint name="elbow_joint">
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface> -->
+            <!-- <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </joint>
         <actuator name="elbow_motor">
             <mechanicalReduction>1</mechanicalReduction>
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </actuator>
     </transmission>
     <transmission name="wrist_1_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <joint name="wrist_1_joint">
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface> -->
+            <!-- <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </joint>
         <actuator name="wrist_1_motor">
@@ -139,6 +150,8 @@
     <transmission name="wrist_2_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <joint name="wrist_2_joint">
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface> -->
+            <!-- <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </joint>
         <actuator name="wrist_2_motor">
@@ -149,6 +162,8 @@
     <transmission name="wrist_3_trans">
         <type>transmission_interface/SimpleTransmission</type>
         <joint name="wrist_3_joint">
+            <!-- <hardwareInterface>hardware_interface/PositionJointInterface</hardwareInterface> -->
+            <!-- <hardwareInterface>hardware_interface/VelocityJointInterface</hardwareInterface> -->
             <hardwareInterface>hardware_interface/EffortJointInterface</hardwareInterface>
         </joint>
         <actuator name="wrist_3_motor">
@@ -329,7 +344,7 @@
         <child link="shoulder_link" />
         <origin rpy="0 0 0" xyz="0 0 0.1625" />
         <axis xyz="0 0 1" />
-        <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+        <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
         <dynamics damping="0" friction="0" />
     </joint>
     <joint name="shoulder_lift_joint" type="revolute">
@@ -337,7 +352,7 @@
         <child link="upper_arm_link" />
         <origin rpy="1.570796327 0 0" xyz="0 0 0" />
         <axis xyz="0 0 1" />
-        <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+        <limit effort="150.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
         <dynamics damping="0" friction="0" />
     </joint>
     <joint name="elbow_joint" type="revolute">
@@ -345,7 +360,7 @@
         <child link="forearm_link" />
         <origin rpy="0 0 0" xyz="-0.425 0 0" />
         <axis xyz="0 0 1" />
-        <limit effort="150.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793" />
+        <limit effort="150.0" lower="-3.141592653589793" upper="3.141592653589793" velocity="3.141592653589793"/>
         <dynamics damping="0" friction="0" />
     </joint>
     <joint name="wrist_1_joint" type="revolute">
@@ -353,7 +368,7 @@
         <child link="wrist_1_link" />
         <origin rpy="0 0 0" xyz="-0.3922 0 0.1333" />
         <axis xyz="0 0 1" />
-        <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+        <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
         <dynamics damping="0" friction="0" />
     </joint>
     <joint name="wrist_2_joint" type="revolute">
@@ -361,7 +376,7 @@
         <child link="wrist_2_link" />
         <origin rpy="1.570796327 0 0" xyz="0 -0.0997 -2.044881182297852e-11" />
         <axis xyz="0 0 1" />
-        <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+        <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
         <dynamics damping="0" friction="0" />
     </joint>
     <joint name="wrist_3_joint" type="revolute">
@@ -369,7 +384,7 @@
         <child link="wrist_3_link" />
         <origin rpy="1.570796326589793 3.141592653589793 3.141592653589793" xyz="0 0.0996 -2.042830148012698e-11" />
         <axis xyz="0 0 1" />
-        <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793" />
+        <limit effort="28.0" lower="-6.283185307179586" upper="6.283185307179586" velocity="3.141592653589793"/>
         <dynamics damping="0" friction="0" />
     </joint>
     <!-- ROS-Industrial 'base' frame: base_link to UR 'Base' Coordinates transform -->
@@ -432,7 +447,7 @@
     <joint name="laser_scanner_joint" type="fixed">
         <parent link="flange" />
         <child link="laser_scanner_link" />
-        <origin rpy="0 -0.2879793 0" xyz="-0.025 0 -0.05" />
+        <origin rpy="0 0 0" xyz="-0.025 0 -0.05" />
     </joint>
     <gazebo reference="laser_scanner_link">
         <material>Gazebo/Red</material>
@@ -456,12 +471,19 @@
                     <max>0.158</max>
                     <resolution>0.01</resolution>
                 </range>
+                <noise>
+                    <type>gaussian</type>
+                    <mean>0.0</mean>
+                    <stddev>0.01</stddev>
+                </noise>
             </ray>
             <!-- Add Gazebo Laser Scanner Plugin -->
             <plugin filename="libgazebo_ros_laser.so" name="gazebo_ros_laser">
                 <!-- ROS Topic for publishing laser scans -->
                 <topicName>laser_scan</topicName>
-                <frameName>laser_scanner_link</frameName>
+                <!-- <frameName>laser_scanner_link</frameName> -->
+                <!-- changed frame for the calibration process -->
+                <frameName>flange</frameName>
                 <updateRate>10</updateRate>
                 <!-- Rate in Hz -->
             </plugin>

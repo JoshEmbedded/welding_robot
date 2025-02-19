@@ -51,6 +51,9 @@ pos_joint_traj_controller:
   state_publish_rate: *loop_hz
   action_monitor_rate: 10
 
-joint_group_pos_controller:
+joint_group_position_controller:
   type: position_controllers/JointGroupPositionController
   joints: *robot_joints
+  joint_limits:
+        - max_velocity: 3.141592653589793
+        - max_acceleration: 1.0
