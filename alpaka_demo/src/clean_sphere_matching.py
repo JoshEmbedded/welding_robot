@@ -58,25 +58,6 @@ class RobotScanner:
         if self.scanning:
             T_world_flange = self.get_latest_transform("world", "flange")
             self.process_scan(scan_msg, T_world_flange)
-            
-    # def process_scan(self, scan_msg):
-    #     """Convert LaserScan to PointCloud2 and transform to a consistent frame."""
-    #     cloud_msg = self.laserscan_to_pointcloud(scan_msg)
-    #     pcd = self.pointcloud2_to_open3d(cloud_msg)
-    #     T_world_flange = self.get_transform("world", "flange")
-
-    #     if self.first_scan_transform is None:
-    #         self.first_scan_transform = copy.deepcopy(T_world_flange)
-
-    #     T_first_scan_world = np.linalg.inv(self.first_scan_transform)
-    #     T_flange_first = T_first_scan_world @ T_world_flange
-
-
-    #     transformed_pcd = self.transform_pointcloud(pcd, T_flange_first)
-    #     self.data_storage.append({
-    #                                 'cloud': copy.deepcopy(cloud_msg),
-    #                                 'transform': copy.deepcopy(T_flange_first)
-    #                                 })
     
     def process_scan(self, scan_msg, transform):
         """Convert LaserScan to PointCloud2 and transform to a consistent frame."""
@@ -228,74 +209,11 @@ def merge_pointclouds(pcd_list):
     return copy.deepcopy(merged_pcd)
 
 
-# def robot_scan(robot_movement):
-    
-#     orientations = []
-#     point_clouds = []
-    
-#     bag = rosbag.Bag('cloud.bag', 'w')
-    
-#     scan_files = ["scan_1.pcd", "scan_2.pcd", "scan_3.pcd", "scan_4.pcd", "scan_5.pcd", "scan_6.pcd"]  # List of individual scans
-
-#     # Create a target pose for the robot (example)
-#     pose = Pose()
-#     pose.position.x = -0.02
-#     pose.position.y = 0.40
-#     pose.position.z = 0.055
-#     pose.orientation.x = 1.0
-#     pose.orientation.y = 0.0
-#     pose.orientation.z = 0.0
-#     pose.orientation.w = 0.0
-    
-#     pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -1.57)
-#     second_viewing_angle = robot_movement.offset_movement(pose, 0.0, 0, 0, 0.7, 0, 0)
-#     third_viewing_angle =  robot_movement.offset_movement(pose, 0.02, 0, 0.01, 0, 0.7, 0)
-#     start_orientations = np.array([pose, second_viewing_angle, third_viewing_angle])
-    
-#     end_pose = robot_movement.offset_movement(pose, 0.04, 0.12, 0, 0, 0, 0)
-#     second_end_pose = robot_movement.offset_movement(pose, 0.04, 0.12, 0, -0.7, 0, 0)
-#     third_end_pose = robot_movement.offset_movement(pose, 0.02, 0.12, -0.02, 0, -0.7, 0)
-    
-#     end_orientations = np.array([end_pose, second_end_pose, third_end_pose])
-    
-#     orientation = np.array([pose, end_pose, second_viewing_angle, second_end_pose, third_viewing_angle, third_end_pose])
-#     direction = 1
-#     for i, pose_n in enumerate(orientation):
-        
-#         robot_movement.move_robot(pose_n, True)
-#         robot_movement.group.set_max_velocity_scaling_factor(0.05)
-#         robot_movement.group.set_max_acceleration_scaling_factor(0.05)
-        
-#         y_movement = 0.12 * direction
-#         first_movement = robot_movement.offset_movement(pose_n, 0, y_movement, 0, 0, 0, 0)
-        
-#         robot_movement.scanning = True
-#         robot_movement.rate.sleep()
-        
-#         while not robot_movement.move_robot(first_movement, True):
-#             robot_movement.rate.sleep()
-        
-#         robot_movement.scanning = False
-        
-#         cloud = merge_pointclouds(robot_movement.data_storage)
-        
-#         robot_movement.cloud_list.append(cloud)
-        
-#         o3d.io.write_point_cloud(scan_files[i], cloud)
-#         robot_movement.data_storage.clear()
-#         robot_movement.first_scan_transform = None
-        
-#         direction = -direction
-
 def robot_scan(robot_movement):
     
     orientations = []
     point_clouds = []
     
-    bag = rosbag.Bag('cloud.bag', 'w')
-    
-    scan_files = ["scan_1.pcd", "scan_2.pcd", "scan_3.pcd", "scan_4.pcd", "scan_5.pcd", "scan_6.pcd"]  # List of individual scans
-
     # Create a target pose for the robot (example)
     pose = Pose()
     pose.position.x = -0.02
@@ -309,13 +227,10 @@ def robot_scan(robot_movement):
     pose = robot_movement.offset_movement(pose, 0, 0, 0, 0, 0, -1.57)
     second_viewing_angle = robot_movement.offset_movement(pose, 0.0, 0, 0, 0.7, 0, 0)
     third_viewing_angle =  robot_movement.offset_movement(pose, 0.02, 0, 0.01, 0, 0.7, 0)
-    start_orientations = np.array([pose, second_viewing_angle, third_viewing_angle])
     
     end_pose = robot_movement.offset_movement(pose, 0.04, 0.12, 0, 0, 0, 0)
     second_end_pose = robot_movement.offset_movement(pose, 0.04, 0.12, 0, -0.7, 0, 0)
     third_end_pose = robot_movement.offset_movement(pose, 0.02, 0.12, -0.02, 0, -0.7, 0)
-    
-    end_orientations = np.array([end_pose, second_end_pose, third_end_pose])
     
     orientation = np.array([pose, end_pose, second_viewing_angle, second_end_pose, third_viewing_angle, third_end_pose])
     direction = 1
@@ -363,43 +278,6 @@ def segment_plane(pcd, distance_threshold=0.005, ransac_n=3, num_iterations=1000
     object_cloud = pcd.select_by_index(inliers, invert=True)  # Everything NOT in the plane
     
     return object_cloud, plane_cloud  # Return non-plane (sphere) and plane
-
-        
-# def pointcloud_segmentation(scan):
-#     """ Callback function to process incoming PointCloud2 data """
-#     rospy.loginfo("Received PointCloud2 message")
-
-#     # Convert to Open3D point cloud
-#     # pcd = ros_pointcloud2_to_open3d(msg)
-    
-#     # o3d.io.write_point_cloud("raw_cloud.pcd", pcd)
-    
-#     pcd = o3d.io.read_point_cloud(scan)
-    
-#     pcd = pcd.voxel_down_sample(voxel_size=0.002)
-#     # Visualize the filtered cloud
-#     # o3d.visualization.draw_geometries([pcd])
-#     # Remove outliers
-#     pcd_filtered, ind = pcd.remove_statistical_outlier(nb_neighbors=5, std_ratio=1.5)
-        
-#     # o3d.visualization.draw_geometries([pcd_filtered])
-
-#     pcd_sphere, pcd_plane = segment_plane(pcd_filtered)
-        
-#     # # Save & visualize results
-#     # o3d.io.write_point_cloud("sphere_cloud.pcd", pcd_sphere)
-#     # o3d.io.write_point_cloud("plane_cloud.pcd", pcd_plane)
-
-#     print("Plane removed! Displaying remaining object (sphere).")
-#     # o3d.visualization.draw_geometries([pcd_sphere])
-#     # o3d.visualization.draw_geometries([pcd_plane])
-    
-#     print("Additional Radius Removal! Displaying remaining object (sphere).")
-#     final_sphere, inliers = pcd_sphere.remove_radius_outlier(nb_points=5, radius=0.005)
-    
-#     # Visualize the filtered cloud
-#     print("Final Sphere")
-#     o3d.visualization.draw_geometries([final_sphere])
     
 def pointcloud_segmentation(scan):
 
@@ -462,23 +340,6 @@ def filter_invalid_fits(sphere_centers, sphere_radii, expected_radius, threshold
             valid_centers.append(center)
 
     return np.array(valid_centers)
-
-# def cost_function(params, sphere_centers):
-#     """
-#     Compute the sum of squared distances between sphere centers.
-#     - params: (dx, dy, dz) - translation correction for T_sensor→flange.
-#     - sphere_centers: List of estimated sphere centers from different views.
-#     """
-#     # Apply translation correction (params = [dx, dy, dz])
-#     transformed_centers = sphere_centers + params  
-
-#     # Compute sum of squared distances between each pair of centers
-#     cost = 0
-#     for i in range(len(transformed_centers)):
-#         for j in range(i+1, len(transformed_centers)):
-#             cost += np.linalg.norm(transformed_centers[i] - transformed_centers[j])**2
-
-#     return cost
 
 def translation_to_homogeneous(translation):
     """
@@ -603,41 +464,10 @@ def objective_function(params, cloud_list):
     total_centre_points = np.array(total_centre_points)
     total_radii = np.array(total_radii)
     
-    # filtered_centre_points = filter_invalid_fits(total_centre_points, total_radii, expected_radius)
+    filtered_centre_points = filter_invalid_fits(total_centre_points, total_radii, expected_radius)
     # cost = cost_function(filtered_centre_points)
-    cost = cost_function(total_centre_points)
+    cost = cost_function(filtered_centre_points)
     return cost
-        
-    
-# def sphere_optimisation():
-    
-#     scan_files = ["scan_1.pcd", "scan_2.pcd", "scan_3.pcd", "scan_4.pcd", "scan_5.pcd", "scan_6.pcd"]  # 
-
-#     total_centre_points = []
-#     total_radii = []
-#     expected_radius = 0.011
-#     for scan in scan_files:
-#         sphere = pointcloud_segmentation(scan)
-#         centre_point, radius = fit_sphere_pseudoinverse(sphere)
-#         total_centre_points.append(centre_point)
-#         total_radii.append(radius)
-    
-#     # Filter out invalid sphere fits
-#     total_centre_points = np.array(total_centre_points)
-#     total_radii = np.array(total_radii)
-    
-#     filtered_centre_points = filter_invalid_fits(total_centre_points, total_radii, expected_radius)
-
-#     # Optimize translation correction
-#     initial_guess = [0.025, 0.0, 0.050]
-    
-#     # Solve using Trust-Region Reflective Algorithm
-#     result = least_squares(cost_function, x0=initial_guess, args=(filtered_centre_points, ), method='trf', verbose=2)
-
-#     # Extract optimized translation correction
-#     optimized_translation = result.x
-#     print(f"Optimized Sensor-to-Flange Translation: {optimized_translation}")
-#     print("Calibration complete!")
 
 def sphere_optimisation():
     
@@ -663,7 +493,7 @@ if __name__ == '__main__':
         
         scanner = RobotScanner()
         
-        # robot_scan(scanner)
+        robot_scan(scanner)
         
         sphere_optimisation()
                 
