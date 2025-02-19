@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>alpaka_demo</name>
+  <version>0.0.0</version>
+  <description>The alpaka_demo package</description>
+
+  <maintainer email="joshua.schiff.2000@gmail.com">Joshua Schiff</maintainer>
+  <license>TODO</license>
+
+  <author email="joshua.schiff.2000@gmail.com">Joshua Schiff</author>
+
+  <!-- The *depend tags are used to specify dependencies -->
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>geometry_msgs</build_depend>
+  <build_depend>roscpp</build_depend>
+  <build_depend>rospy</build_depend>
+  <build_depend>sensor_msgs</build_depend>
+  <build_depend>std_msgs</build_depend>
+  <build_depend>moveit_core</build_depend>
+  <build_depend>moveit_ros_planning_interface</build_depend>
+  <build_depend>rosbag</build_depend>
+  <build_depend>message_generation</build_depend>
+  <build_depend>laser_geometry</build_depend>
+  <depend>gazebo_ros</depend>
+  <depend>tf</depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>roscpp</exec_depend>
+  <exec_depend>rospy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <exec_depend>moveit_core</exec_depend>
+  <exec_depend>moveit_ros_planning_interface</exec_depend>
+  <exec_depend>rosbag</exec_depend>
+  <exec_depend>message_runtime</exec_depend>
+  <exec_depend>laser_geometry</exec_depend>
+
+  <export>
+    <gazebo>
+      <model_path>$(find your_package)/models</model_path>
+    </gazebo>
+  </export>
+
+</package>

@@ -1,0 +1,67 @@
+<robot name="laser_scanner_test" xmlns:xacro="http://wiki.ros.org/xacro">>
+
+    <link name="world" />
+    <joint name="world_joint" type="fixed">
+        <parent link="world" />
+        <child link="base_link" />
+        <origin rpy="0 0 0" xyz="0 0 0" />
+    </joint>
+
+  <!-- Base Link -->
+  <link name="base_link"/>
+
+  <!-- Laser Scanner Link -->
+  <link name="laser_scanner_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <cylinder length="0.1" radius="0.015" />
+      </geometry>
+    </visual>
+    <collision>
+      <geometry>
+        <cylinder length="0.1" radius="0.015" />
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1" />
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <inertia ixx="0.03" iyy="0.03" izz="0.03" ixy="0.0" ixz="0.0" iyz="0.0" />
+    </inertial>
+  </link>
+
+  <!-- Joint -->
+  <joint name="base_to_laser" type="fixed">
+    <parent link="base_link"/>
+    <child link="laser_scanner_link"/>
+    <origin xyz="0 0 0.075" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Define the Laser Sensor -->
+  <gazebo reference="laser_scanner_link">
+    <sensor name="laser_scan" type="ray">
+      <origin xyz="0 -0.1 0" rpy="0 0 0"/>
+      <ray>
+        <scan>
+          <horizontal>
+            <samples>100</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.474</min_angle>
+            <max_angle>0.474</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.1</min>
+          <max>2</max>
+          <resolution>0.01</resolution>
+        </range>
+      </ray>
+      <plugin filename="libgazebo_ros_laser.so" name="gazebo_ros_laser">
+        <topicName>laser_scan</topicName>
+        <frameName>laser_scanner_link</frameName>
+        <updateRate>10</updateRate>
+      </plugin>
+    </sensor>
+  </gazebo>
+
+</robot>
