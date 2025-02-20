@@ -25,7 +25,8 @@ Ensure you have the following installed:
    roslaunch ur5e_laser_sim demo_gazebo.launch
    ```
 2. **Press the Play button** in Gazebo to start the simulation.  
-3. **Add a floor plane** as a scene object (important for path planning to avoid collisions).  
+3. **Add a floor plane** as a scene object (important for path planning to avoid collisions).
+
 
 ---
 
@@ -50,6 +51,7 @@ rosrun alpaka_demo clean_plane_matching.py
 
 ### Translation Calibration  
 To calibrate the translation component using a sphere:
+**For Translation calibration** place a sphere object of radius ~0.01 at {0,0.42,0.01}.
 
 ```bash
 rosrun alpaka_demo clean_sphere_matching.py
