@@ -16,6 +16,7 @@ laser_data_buffer = deque(maxlen=10)  # Store the last 10 messages
 new_data = True
 laser_data = LaserScan()
 global seam_pose
+vector_detection_method = False
 
 # Create a publisher (global to avoid creating it repeatedly in the function)
 weld_seam_pose_pub = rospy.Publisher('/weld_seam_pose', PoseStamped, queue_size=10)
@@ -26,9 +27,18 @@ def laser_scan_callback(msg):
     Callback function to process incoming LaserScan messages.
     """
     global new_data, laser_data
+    
+    if msg is None or not hasattr(msg, "ranges") or msg.ranges is None:
+        rospy.logerr("Received invalid LaserScan message!")
+        return
+    
     if new_data:
         laser_data = msg
-        find_seam(laser_data)
+        rospy.loginfo(f"Received LaserScan with {len(laser_data.ranges)} points.")
+        if vector_detection_method:
+            vector_intersection_seam_detection(laser_data)
+        else:
+            find_seam(laser_data)
         new_data = False  # Set to False after processing
 
 import numpy as np
@@ -79,25 +89,153 @@ def interpolate_nan_with_tolerance(data, tolerance):
 
     return data_interpolated
 
+def interpolate_nan_with_tolerance(data, tolerance):
+    """
+    Interpolates NaN values in a 1D array based on surrounding valid values within a certain tolerance.
 
-def find_seam(laser_scan):
+    Parameters:
+        data (np.ndarray): The input 1D array containing `NaN` values.
+        tolerance (float): The maximum allowed gap (in indices) for interpolation to occur.
+
+    Returns:
+        np.ndarray: A new array with interpolated values for `NaN` elements within the tolerance range.
+    """
+    # Create a copy to avoid modifying the original data
+    data_interpolated = np.copy(data)
+
+    # Find indices of NaN values
+    nan_indices = np.where(np.isnan(data))[0]
+
+    for nan_idx in nan_indices:
+        # Look for valid values before and after the current NaN index
+        valid_before = None
+        valid_after = None
+
+        # Search backward for the nearest valid value
+        for i in range(nan_idx - 1, -1, -1):
+            if not np.isnan(data[i]):
+                valid_before = (i, data[i])
+                break
+
+        # Search forward for the nearest valid value
+        for i in range(nan_idx + 1, len(data)):
+            if not np.isnan(data[i]):
+                valid_after = (i, data[i])
+                break
+
+        # Interpolate only if both valid_before and valid_after are within the tolerance range
+        if valid_before and valid_after:
+            gap_before = nan_idx - valid_before[0]
+            gap_after = valid_after[0] - nan_idx
+
+            if gap_before <= tolerance and gap_after <= tolerance:
+                # Linear interpolation
+                value = (valid_before[1] * gap_after + valid_after[1] * gap_before) / (gap_before + gap_after)
+                data_interpolated[nan_idx] = value
+
+
+def vector_intersection_seam_detection(laser_scan):
+    """
+    Detects seam by finding intersection points of vectors formed between laser scan points.
+
+    Parameters:
+        laser_scan (list or np.ndarray): Laser scan range data.
+
+    Returns:
+        list: A list of intersection points (x, y) in 2D space.
+    """
     
     # Extract the range data (assuming the ranges are in the 'ranges' field of LaserScan message)
     range_data = np.array(laser_scan.ranges)
     
     range_data[range_data == float('inf')] = np.nan  # Replace 'inf' with NaN
     
-    rospy.loginfo(f"Processed range data: {range_data}")
     
-    range_data = interpolate_nan_with_tolerance(range_data, 3)
+    angle_min = laser_scan.angle_min
+    angle_increment = laser_scan.angle_increment
     
-    rospy.loginfo(f"Interpolated: {range_data}")
+    # Step 1: Convert laser scan ranges to 2D points
+    angles = np.arange(angle_min, angle_min + len(range_data) * angle_increment, angle_increment)
+    points = np.array([
+        (r * np.cos(a), r * np.sin(a)) if np.isfinite(r) else (np.nan, np.nan)
+        for r, a in zip(range_data, angles)
+    ])
     
-     # You can either ignore these values or replace NaNs with the previous valid range.
-    # range_data = np.nan_to_num(range_data, nan=np.nan)  # This will turn NaNs into a default value like zero
+    intersection_points = []
+
+    threshold = 0.01
+    new_vector = True
+    stored_gradients = []
     
-    # Print the range data for debugging
-    # rospy.loginfo(f"Range data: {range_data}")
+    for i in range(len(points)-2):
+        
+        p1, p2 = points[i], points[i+1]
+        
+        # Skip if any of the points are invalid
+        if np.isnan(p1).any() or np.isnan(p2).any():
+            continue
+        
+        vector = np.array(p2) - np.array(p1)
+        gradient = (p2[1]-p1[1])/(p2[0]-p1[0])
+        
+        if new_vector:
+            intersection_points.append(p1)
+            prev_gradient = gradient
+            stored_gradients.append(prev_gradient)
+            new_vector = False
+            
+            continue
+        
+        # Compare vector direction based on magnitude
+        if abs(prev_gradient - gradient) <= threshold:
+            continue
+        else:
+            # Store the previous vector when a significant change is detected
+            # rospy.loginfo(f'Prev vector {prev_gradient}, current vector {gradient} and point: {p1}')
+            new_vector = True
+            continue
+    
+    # Store the last gradient after the final iteration
+    stored_gradients.append(prev_gradient)
+            
+    # Make sure we have enough vectors to compute intersection
+    if len(stored_gradients) < 2:
+        print("Not enough gradients to compute an intersection.")
+        return []
+    
+    # Assuming stored_gradients[0] and stored_gradients[1] are the gradients of the two lines
+    m1, m2 = stored_gradients[0], stored_gradients[1]
+    
+    # Check if gradients are too similar
+    if abs(m1 - m2) < 1e-6:
+        print("Gradients too similar; lines may be parallel.")
+        return None
+    
+    # Compute the y-intercepts of both lines (b1 and b2)
+    b1 = intersection_points[0][1] - m1 * intersection_points[0][0]
+    b2 = intersection_points[1][1] - m2 * intersection_points[1][0]
+    
+    # Calculate the intersection point
+    x_intersection = (b2 - b1) / (m1 - m2)
+    y_intersection = m1 * x_intersection + b1
+    
+    return convertLaserTransform(x_intersection, y_intersection)
+
+def find_seam(laser_scan):
+    
+    # Extract the range data (assuming the ranges are in the 'ranges' field of LaserScan message)
+    if laser_scan is None or laser_scan.ranges is None:
+        rospy.logerr("find_seam received invalid laser_scan!")
+        return
+
+    range_data = np.array(laser_scan.ranges)
+    if range_data is None or len(range_data) == 0:
+        rospy.logerr("Laser scan data is empty!")
+        return
+    
+    range_data[range_data == float('inf')] = np.nan  # Replace 'inf' with NaN
+    
+    # range_data = interpolate_nan_with_tolerance(range_data, 3)
     
     # Step 2: Find local maxima and minima
     local_maxima = []
@@ -261,9 +399,16 @@ def convertLaserTransform(x, y, angle):
 if __name__ == '__main__':
     rospy.init_node('test_example_node', anonymous=True)
     
-    # Subscribe to the /scan topic
-    rospy.Subscriber('/laser_scan', LaserScan, laser_scan_callback)
+    vector_detection_method = rospy.get_param('~vector_intersection_method', False)
+    scan_topic = rospy.get_param('~scan_topic', '/laser_scan')
     
+    if vector_detection_method:
+        rospy.loginfo("Using vector intersection method.")
+    else:
+        rospy.loginfo("Using local maxima and minima method.")
+        
+    # Subscribe to the /scan topic
+    rospy.Subscriber(scan_topic, LaserScan, laser_scan_callback)
     
     # Keep the node running
     rospy.spin()
