@@ -19,6 +19,9 @@
     <arg name="moveit_controller_manager" value="ros_control" />
   </include>
 
+  <arg name="scene_file" default="$(find ur5e_laser_sim)/config/floor_plane.scene"/> 
+  <node name = "moveit_publish_scene_from_text" pkg= "moveit_ros_planning" type = "moveit_publish_scene_from_text" args= "$(arg scene_file)"/>
+
   <!-- Start MoveIt Servo -->
   <!-- <arg name="config" default="$(find ur5e_laser_sim)/config/servo_simulated_config.yaml"/>
 
