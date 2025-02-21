@@ -8,6 +8,7 @@
   <arg name="paused" default="true" doc="Start Gazebo paused"/>
   <arg name="world_name" default="worlds/empty.world" doc="Gazebo world file"/>
   <arg name="world_pose" default="-x 0 -y 0 -z 0 -R 0 -P 0 -Y 0" doc="Pose to spawn the robot at"/>
+  <arg name="enable_noise" default="false" doc="Enable noise in the robot model"/>
 
   <!-- Launch Gazebo and spawn the robot -->
   <include file="$(dirname)/gazebo.launch" pass_all_args="true"/>
@@ -18,4 +19,18 @@
     <arg name="load_robot_description" value="false" />
     <arg name="moveit_controller_manager" value="ros_control" />
   </include>
+
+  <!-- Start MoveIt Servo -->
+  <!-- <arg name="config" default="$(find ur5e_laser_sim)/config/servo_simulated_config.yaml"/>
+
+ <node name="servo_server" pkg="moveit_servo" type="servo_server" output="screen"> -->
+    <!-- Load general configuration file (if any) -->
+    <!-- <rosparam command="load" file="$(arg config)"/> -->
+
+    <!-- Load robot description kinematics configuration (make sure it's properly defined in kinematics.yaml) -->
+    <!-- <rosparam command="load" file="$(find ur5e_laser_sim)/config/kinematics.yaml"/> -->
+
+    <!-- Set the robot_description_kinematics parameter to be used by the servo server -->
+    <!-- <param name="robot_description_kinematics" value="ur5e_laser_robot_kinematics"/> -->
+  <!-- </node>  -->
 </launch>
