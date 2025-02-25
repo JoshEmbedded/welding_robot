@@ -57,13 +57,13 @@ catkin_install_python(PROGRAMS
   src/laser_calibration.py
   src/transformCalculation.py
   src/servo_test.py
-  src/tf_scan_test.py
   src/y_rot_test.py
   src/plane_matching.py
   src/sphere_matching.py
   src/plane_segmentation.py
   src/clean_plane_matching.py
   src/clean_sphere_matching.py
+  src/real_robot_test.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
@@ -75,17 +75,14 @@ add_executable(weld_seam_moveIt src/posePlan_moveIt.cpp)
 ## Declare a C++ executable
 add_executable(calibration src/calibration.cpp)
 add_executable(rotation_test src/rotation_test.cpp)
-add_executable(pointCloud_test src/test_pointCloud.cpp)
 
 ## Add cmake target dependencies of the executable
 add_dependencies(weld_seam_moveIt ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(calibration ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 add_dependencies(rotation_test ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-add_dependencies(pointCloud_test ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Link the library to the executable
 target_link_libraries(weld_seam_moveIt ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES})
 target_link_libraries(calibration ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} calibrationClass)
 target_link_libraries(calibrationClass ${catkin_LIBRARIES})
 target_link_libraries(rotation_test ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} calibrationClass)
-target_link_libraries(pointCloud_test ${catkin_LIBRARIES} ${GAZEBO_LIBRARIES} calibrationClass)
