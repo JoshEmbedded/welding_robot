@@ -447,7 +447,7 @@
     <joint name="laser_scanner_joint" type="fixed">
         <parent link="flange" />
         <child link="laser_scanner_link" />
-        <origin rpy="0 0 0" xyz="-0.025 0 -0.05" />
+        <origin rpy="1.5708 0 1.5708" xyz="-0.025 0 -0.05" />
     </joint>
     <gazebo reference="laser_scanner_link">
         <material>Gazebo/Red</material>
@@ -456,7 +456,7 @@
     <gazebo reference="laser_scanner_link">
         <sensor name="laser_scan" type="ray">
             <visualize>true</visualize>
-            <origin xyz="0 0 0" rpy="0 0 0"/>
+            <pose>0 0 0 -1.5708 -1.5708 0</pose>
             <ray>
                 <scan>
                     <horizontal>
