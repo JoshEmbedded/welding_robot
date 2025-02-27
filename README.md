@@ -1,6 +1,12 @@
 
 # Welding Robot
 
+## Calibration Branch Description
+
+This branch is used for testing of calibration procedure. Successful code is then merged into the 'Main' brain. 
+
+**Recommended not to abstract from this branch!**
+
 ## Brief Description
 
 This package contains code that can run the operation of a custom UR5e robot to perform weld seam detection using laser scan data and perform laser scan to flange calibration.
