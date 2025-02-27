@@ -35,12 +35,11 @@ link_directories(${GAZEBO_LIBRARY_DIRS})
 
 ## Install Python scripts
 catkin_install_python(PROGRAMS
-  src/scan_pose.py
   src/scan_test.py
   src/marker_publish.py
   src/laser_scan_viz.py
-  src/transformCalculation.py
-  src/move_robot.py
+  src/clean_plane_matching.py
+  src/clean_sphere_matching.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

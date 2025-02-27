@@ -8,9 +8,15 @@ Panels:
         - /MotionPlanning1/Planned Path1
         - /TF1
         - /TF1/Frames1
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
         - /LaserScan1
       Splitter Ratio: 0.5
     Tree Height: 215
+=======
+        - /PointCloud21
+      Splitter Ratio: 0.5
+    Tree Height: 236
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
   - Class: rviz/Help
     Name: Help
   - Class: rviz/Views
@@ -148,7 +154,7 @@ Visualization Manager:
         Robot Alpha: 0.5
         Robot Color: 150; 50; 150
         Show Robot Collision: false
-        Show Robot Visual: true
+        Show Robot Visual: false
         Show Trail: false
         State Display Time: 0.05 s
         Trail Step Size: 1
@@ -263,7 +269,39 @@ Visualization Manager:
         Show Robot Collision: false
         Show Robot Visual: true
       Value: true
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
       Velocity_Scaling_Factor: 0.5
+=======
+      Velocity_Scaling_Factor: 0.4
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/LaserScan
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
+      Enabled: false
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: LaserScan
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.009999999776482582
+      Style: Flat Squares
+      Topic: /laser_scan
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
     - Class: rviz/TF
       Enabled: true
       Filter (blacklist): ""
@@ -329,6 +367,17 @@ Visualization Manager:
                                 {}
       Update Interval: 0
       Value: true
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
+=======
+    - Class: rviz/Marker
+      Enabled: true
+      Marker Topic: visualization_marker
+      Name: Marker
+      Namespaces:
+        {}
+      Queue Size: 100
+      Value: true
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -337,7 +386,11 @@ Visualization Manager:
         Value: true
       Axis: Z
       Channel Name: intensity
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
       Class: rviz/LaserScan
+=======
+      Class: rviz/PointCloud2
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
       Color: 255; 255; 255
       Color Transformer: Intensity
       Decay Time: 0
@@ -345,18 +398,29 @@ Visualization Manager:
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Min Color: 0; 0; 0
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
       Name: LaserScan
+=======
+      Name: PointCloud2
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
       Position Transformer: XYZ
       Queue Size: 10
       Selectable: true
       Size (Pixels): 3
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
       Size (m): 0.009999999776482582
       Style: Flat Squares
       Topic: /laser_scan
+=======
+      Size (m): 9.999999747378752e-05
+      Style: Flat Squares
+      Topic: /assembled_cloud
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
       Unreliable: false
       Use Fixed Frame: true
       Use rainbow: true
       Value: true
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
     - Class: rviz/Marker
       Enabled: true
       Marker Topic: visualization_marker
@@ -365,6 +429,8 @@ Visualization Manager:
         arrow_marker: true
       Queue Size: 100
       Value: true
+=======
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -381,7 +447,11 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
       Distance: 0.6827105283737183
+=======
+      Distance: 0.6604446172714233
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -389,22 +459,38 @@ Visualization Manager:
         Value: false
       Field of View: 0.75
       Focal Point:
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
         X: -0.11824864894151688
         Y: 0.675632119178772
         Z: 1.409906029701233
+=======
+        X: 0.34080952405929565
+        Y: 0.34521156549453735
+        Z: 0.23313678801059723
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
       Pitch: 0.5250003337860107
       Target Frame: world
       Yaw: 1.2867552042007446
+=======
+      Pitch: 0.18999986350536346
+      Target Frame: world
+      Yaw: 6.224943161010742
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
     Saved: ~
 Window Geometry:
   Displays:
     collapsed: false
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
   Height: 848
+=======
+  Height: 1043
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz
   Help:
     collapsed: false
   Hide Left Dock: false
@@ -413,9 +499,18 @@ Window Geometry:
     collapsed: false
   MotionPlanning - Trajectory Slider:
     collapsed: false
+<<<<<<< HEAD:ur10e_alpaka/launch/moveit.rviz
   QMainWindow State: 000000ff00000000fd0000000100000000000001f3000002f6fc0200000007fb000000100044006900730070006c006100790073010000003d00000168000000c900fffffffb0000000800480065006c00700000000342000000bb0000006e00fffffffb0000000a00560069006500770073000000010c000000a4000000a400fffffffb0000000c00430061006d00650072006100000002ff000001610000000000000000fb0000001e004d006f00740069006f006e00200050006c0061006e006e0069006e00670100000374000001890000000000000000fb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000001600000016fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e006701000001ab000001880000017d00ffffff00000312000002f600000001000000020000000100000002fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Views:
     collapsed: false
   Width: 1291
   X: 454
   Y: 27
+=======
+  QMainWindow State: 000000ff00000000fd0000000100000000000001f3000003b9fc0200000007fb000000100044006900730070006c006100790073010000003d0000017d000000c900fffffffb0000000800480065006c00700000000342000000bb0000006e00fffffffb0000000a00560069006500770073000000010c000000a4000000a400fffffffb0000000c00430061006d00650072006100000002ff000001610000000000000000fb0000001e004d006f00740069006f006e00200050006c0061006e006e0069006e00670100000374000001890000000000000000fb00000044004d006f00740069006f006e0050006c0061006e006e0069006e00670020002d0020005400720061006a006500630074006f0072007900200053006c00690064006500720000000000ffffffff0000001600000016fb0000001c004d006f00740069006f006e0050006c0061006e006e0069006e006701000001c0000002360000017d00ffffff000001c7000003b900000001000000020000000100000002fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Views:
+    collapsed: false
+  Width: 960
+  X: 1992
+  Y: 0
+>>>>>>> main:ur5e_laser_sim/launch/moveit.rviz

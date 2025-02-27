@@ -1,0 +1,28 @@
+<launch>
+    <!-- Define an argument with a default value -->
+    <arg name="vector_intersection_method" default="False"/>
+    <arg name="scan_topic" default="/laser_scan"/>
+
+    <!-- Pass the argument as a ROS parameter -->
+    <param name="vector_intersection_method" value="$(arg vector_intersection_method)"/>
+    <param name="scan_topic" value="$(arg scan_topic)"/>
+
+    <!-- Launch laser filter -->
+    <include file="$(dirname)/laser_filter.launch" pass_all_args="true">
+        <arg name="scan_topic" value="$(arg scan_topic)"/>
+    </include>
+    
+    <!-- Launch poseplan_moveit -->
+    <node name="weld_seam_moveIt" pkg="alpaka_demo" type="weld_seam_moveIt" output="screen">
+    </node>
+
+    <!-- Launch scan_test.py -->
+    <node name="scan_test" pkg="alpaka_demo" type="scan_test.py" output="screen" pass_all_args="true">
+        <param name="vector_intersection_method" value="$(arg vector_intersection_method)"/>
+        <param name="scan_topic" value="/scan_filtered"/>
+    </node>
+
+    <!-- Launch marker_publish.py -->
+    <node name="marker_publish" pkg="alpaka_demo" type="marker_publish.py" output="screen">
+    </node>
+</launch>

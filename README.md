@@ -104,6 +104,25 @@ To set the laser scan topic (e.g., `/scan` for the real Sick TIM 561 scanner):
 roslaunch alpaka_demo seam_follow scan_topic:=/scan
 ```
 
+### Calibration:
+
+The laser scan filter must be launched in a separate shell:
+
+```bash
+roslaunch alpaka_demo laser_filter.launch
+```
+
+To run orientation calibration:
+
+```bash
+roslaunch alpaka_demo clean_plane_matching.launch
+```
+
+For translation calibration, place a sphere with a radius of ~0.01 at position `(0, 0.42, radius)`:
+
+```bash
+roslaunch alpaka_demo clean_sphere_matching.launch
+```
 
 ## Features
 
