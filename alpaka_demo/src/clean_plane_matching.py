@@ -169,9 +169,9 @@ class RobotMovement:
         angle = laser_scan.angle_min
         for r in laser_scan.ranges:
             if laser_scan.range_min < r < laser_scan.range_max:
-                x = r * np.cos(angle)
-                y = r * np.sin(angle)
-                points.append([x, y, 0.0])
+                x = r * np.sin(angle)
+                z = r * np.cos(angle)
+                points.append([x, 0.0, z])
             angle += laser_scan.angle_increment
         return np.array(points)
 
@@ -286,17 +286,29 @@ class RobotMovement:
     def preprocess_data(self, data, sensor_flange_transform):
         """Preprocess laser scan data and filter outliers."""
         processed_scans = []
+        
+        point_names = ["scan1.npy", "scan2.npy", "scan3.npy", "scan4.npy", "scan5.npy", "scan6.npy", "scan7.npy", "scan8.npy", "scan9.npy", "scan10.npy"]
+        matrix_names = ["matrix1.npy", "matrix2.npy", "matrix3.npy", "matrix4.npy", "matrix5.npy", "matrix6.npy", "matrix7.npy", "matrix8.npy", "matrix9.npy", "matrix10.npy"]
+        
         for i, scan_pass in enumerate(data):
             # print(f"Processing scan pass: {i+1}.")
             world_points = []
+            raw_points = []
+            raw_transforms = []
 
             for scan in scan_pass:
                 laser_scan = scan['laser_scan']
                 trans, rot = scan['trans'], scan['rot']
                 sensor_points = self.laser_scan_to_points(laser_scan)
+                raw_points.extend(sensor_points.tolist())
                 flange_world_trans = self.make_homogeneous_transform(trans, rot)
+                raw_transforms.extend(np.tile(flange_world_trans, (sensor_points.shape[0],1,1)))
                 world_points.extend(self.transform_points_to_world(flange_world_trans, sensor_flange_transform, sensor_points))
-                
+            
+            ## Save raw points and transforms
+            np.save(point_names[i], np.array(raw_points))
+            np.save(matrix_names[i], np.array(raw_transforms))   
+                         
             world_points = np.array(world_points)
 
             processed_scans.append(world_points)
@@ -424,7 +436,7 @@ class RobotMovement:
             total_cost += self.calculate_cost(calc_residuals)
         
         ## Plotting function of data and plane
-        # self.plot_multiple_planes_with_points(total_plane, total_transform_points, margin=0.1, resolution=50)
+        self.plot_multiple_planes_with_points(total_plane, total_transform_points, margin=0.1, resolution=50)
             
         return total_cost
         
@@ -573,6 +585,7 @@ def collect_data(robot_movement):
         robot_movement.scanning = False
         scan_data.append(copy.deepcopy(robot_movement.data_storage))
         
+        robot_movement.preprocess_data(scan_data, np.eye(4))
         # Save scan data
         with open("scan_data.pkl", "wb") as f:
             pickle.dump(scan_data, f)
@@ -590,7 +603,7 @@ def optimise_rotation():
         scan_data = pickle.load(f)
 
     # Initial guess for Euler angles (roll, pitch, yaw)
-    initial_euler = np.array([0.01, 0.01, 0.01])
+    initial_euler = np.array([1.56, 0.01, 1.56])
 
     # Define search bounds for optimization
     global_lower_bound = -2 * np.pi
@@ -623,7 +636,7 @@ if __name__ == '__main__':
         robot_movement = RobotMovement()
 
         # Collect data
-        scan_data = collect_data(robot_movement)
+        # scan_data = collect_data(robot_movement)
 
         # # Optimise rotation
         optimise_rotation()
