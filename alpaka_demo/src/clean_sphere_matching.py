@@ -6,7 +6,6 @@ import tf2_ros
 import numpy as np
 import open3d as o3d
 import copy
-import rosbag
 import sensor_msgs.point_cloud2 as pc2
 import tf.transformations as tft
 import pickle
@@ -15,7 +14,7 @@ from sensor_msgs.msg import LaserScan, PointCloud2
 from geometry_msgs.msg import Pose
 from tf2_msgs.msg import TFMessage
 from laser_geometry import LaserProjection
-
+from scipy.spatial.transform import Rotation as R
 from scipy.optimize import least_squares
 
 
@@ -63,7 +62,7 @@ class RobotScanner:
         """Convert LaserScan to PointCloud2 and transform to a consistent frame."""
         cloud_msg = self.laserscan_to_pointcloud(scan_msg)
         if len(cloud_msg) == 0:
-            print("Empty cloud, skipping...")
+            # print("Empty cloud, skipping...")
             return
         # T_world_flange = self.get_transform("world", "flange")
 
@@ -109,9 +108,9 @@ class RobotScanner:
 
         for r in scan_msg.ranges:
             if r < scan_msg.range_max:
-                x = r * np.cos(angle)
-                y = r * np.sin(angle)
-                z = 0.0
+                x = r * np.sin(angle)
+                y = 0.0
+                z = r * np.cos(angle)
                 points.append([x, y, z])
             angle += scan_msg.angle_increment
         return points
@@ -263,7 +262,7 @@ def robot_scan(robot_movement):
             
     return point_clouds
 
-def segment_plane(pcd, distance_threshold=0.005, ransac_n=3, num_iterations=1000):
+def segment_plane(pcd, distance_threshold=0.01, ransac_n=3, num_iterations=1000):
     """
     Plane segmentation to remove calibration board.
     - distance_threshold: Defines inlier points close to the plane.
@@ -286,21 +285,21 @@ def pointcloud_segmentation(scan):
     
     # pcd = pcd.voxel_down_sample(voxel_size=0.001)
     # print("Inital Cloud")
-    # o3d.visualization.draw_geometries([pcd])
+    o3d.visualization.draw_geometries([pcd])
 
     # Remove outliers
-    pcd_filtered, ind = pcd.remove_statistical_outlier(nb_neighbors=5, std_ratio=1.5)
+    pcd_filtered, ind = pcd.remove_statistical_outlier(nb_neighbors=3, std_ratio=1.2)
 
     pcd_sphere, pcd_plane = segment_plane(pcd_filtered)
         
     # print("Plane removed! Displaying remaining object (sphere).")
    
     # print("Additional Radius Removal! Displaying remaining object (sphere).")
-    final_sphere, inliers = pcd_sphere.remove_radius_outlier(nb_points=7, radius=0.005)
+    final_sphere, inliers = pcd_sphere.remove_radius_outlier(nb_points=3, radius=0.01)
     
     # Visualize the filtered cloud
     # print("Final Sphere")
-    # o3d.visualization.draw_geometries([final_sphere])
+    o3d.visualization.draw_geometries([final_sphere])
     
     return final_sphere
     
@@ -341,7 +340,7 @@ def filter_invalid_fits(sphere_centers, sphere_radii, expected_radius, threshold
 
     return np.array(valid_centers)
 
-def translation_to_homogeneous(translation):
+def translation_to_homogeneous(translation, rotation):
     """
     Create a 4x4 homogeneous transformation matrix from a translation vector.
     
@@ -351,7 +350,10 @@ def translation_to_homogeneous(translation):
     Returns:
     numpy array: A 4x4 homogeneous transformation matrix.
     """
+    R_matrix = R.from_euler('xyz', rotation).as_matrix()
+    
     T = np.eye(4)  # Initialize as identity matrix
+    T[:3, :3] = R_matrix  # Set rotation part
     T[:3, 3] = translation  # Set translation part
     return T
 
@@ -444,13 +446,13 @@ def cost_function(sphere_centers):
 
     return cost
 
-def objective_function(params, cloud_list):
+def objective_function(params, cloud_list, rotation, expected_radius):
     
     total_centre_points = []
     total_radii = []
-    expected_radius = 0.011
     
-    translation_transform = translation_to_homogeneous(params)
+    
+    translation_transform = translation_to_homogeneous(params, rotation)
     
     transformed_cloud = post_process_data(cloud_list, translation_transform)
     
@@ -477,10 +479,15 @@ def sphere_optimisation():
     # print(f"Loaded {len(cloud_data[0])} scan in pass 0")
         
     # Optimize translation correction
-    initial_guess = [0.025, 0.0, 0.050]
+    initial_translation_guess = [0.035, 0.0, 0.040]
+    
+    # Rotation Euler angles (XYZ order)
+    rotation = np.array([1.5708, 0, 1.5708])
+    
+    expected_radius = 0.011
     
     # Solve using Trust-Region Reflective Algorithm
-    result = least_squares(objective_function, x0=initial_guess, args=(cloud_data,), method='trf', verbose=2)
+    result = least_squares(objective_function, x0=initial_translation_guess, args=(cloud_data,rotation,expected_radius), method='trf', verbose=2)
 
     # Extract optimized translation correction
     optimized_translation = result.x
