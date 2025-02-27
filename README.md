@@ -1,6 +1,13 @@
 
 # Welding Robot
 
+## alpaka_eff Branch Description
+
+This branch contains the custom config and models of Alpaka custom welding end-effector mounted on a UR10e robot.
+The custom config for these robots have been created so the robot can be used in Gazebo with MoveIt. 
+
+This is purely for aestetics. **Important to note that the end-effector does not have a collision model attached**, allowing the laser origin to be inside the model.
+
 ## Brief Description
 
 This package contains code that can run the operation of a custom UR5e robot to perform weld seam detection using laser scan data and perform laser scan to flange calibration.
@@ -37,13 +44,13 @@ Run separate launches in different terminal shells.
 To launch the robot in Gazebo:
 
 ```bash
-roslaunch ur5e_laser_sim demo_gazebo.launch
+roslaunch ur10e_alpaka demo_gazebo.launch
 ```
 
 To launch with simulated noise from the laser scanner:
 
 ```bash
-roslaunch ur5e_laser_sim demo_gazebo.launch enable_noise:=true
+roslaunch ur10e_alpaka demo_gazebo.launch enable_noise:=true
 ```
 
 ### Real ROS Robot Driver 
@@ -53,25 +60,17 @@ To launch the real UR5e ROS Driver (robot ip = 192.168.251.102):
 Update robot_ip parameter with correct address.
 
 ```bash
-roslaunch ur_robot_driver ur5e_bringup.launch robot_ip:=192.168.251.102
-```
-
-To launch the real UR5e ROS Driver (w/ previously extracted config / robot ip = 192.168.251.102):
-
-Update robot_ip & kinematics_config parameter with correct address and file path.
-
-```bash
-roslaunch ur_robot_driver ur5e_bringup.launch robot_ip:=192.168.251.102 kinematics_config:=$(rospack find ur5e_laser_sim)/config/my_robot_calibration.yaml
+roslaunch ur_robot_driver ur10e_bringup.launch robot_ip:=192.168.251.102
 ```
 
 To launch a MoveIt with RViz GUI:
 
 ```bash
-roslaunch ur5e_moveit_config moveit_planning_execution.launch
+roslaunch ur10e_moveit_config moveit_planning_execution.launch
 ```
 
 ```bash
-roslaunch ur5e_moveit_config moveit_rviz.launch rviz_config:=$(rospack find ur5e_moveit_config)/launch/moveit.rviz
+roslaunch ur10e_moveit_config moveit_rviz.launch rviz_config:=$(rospack find ur10e_moveit_config)/launch/moveit.rviz
 ```
 
 ### Sick TIM 561
@@ -105,25 +104,6 @@ To set the laser scan topic (e.g., `/scan` for the real Sick TIM 561 scanner):
 roslaunch alpaka_demo seam_follow scan_topic:=/scan
 ```
 
-### Calibration:
-
-The laser scan filter must be launched in a separate shell:
-
-```bash
-roslaunch alpaka_demo laser_filter.launch
-```
-
-To run orientation calibration:
-
-```bash
-roslaunch alpaka_demo clean_plane_matching.launch
-```
-
-For translation calibration, place a sphere with a radius of ~0.01 at position `(0, 0.42, radius)`:
-
-```bash
-roslaunch alpaka_demo clean_sphere_matching.launch
-```
 
 ## Features
 
@@ -139,7 +119,7 @@ roslaunch alpaka_demo clean_sphere_matching.launch
 
 - The `laser_filters.yaml` file inside `alpaka_demo/include/config` allows modification of the filter method for laser scan data.
 
-- The custom configuration package `ur5e_laser_sim` was abstracted from the UR5e config from the Universal Robots package but added with a custom `laser_scan.xacro`.
+- The custom configuration package `ur10e_alpaka` was abstracted from the UR10e config from the Universal Robots package but added with a custom `laser_scan.xacro` and end-effector model from Alpaka Industries.
 
 ## Contribution
 
