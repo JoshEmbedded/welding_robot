@@ -40,6 +40,7 @@ catkin_install_python(PROGRAMS
   src/laser_scan_viz.py
   src/clean_plane_matching.py
   src/clean_sphere_matching.py
+  src/path_record.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
