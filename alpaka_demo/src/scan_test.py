@@ -9,6 +9,7 @@ import tf
 import tf2_ros
 from tf2_ros import TransformException
 from tf2_geometry_msgs import do_transform_pose
+from tf2_geometry_msgs import do_transform_point
 import geometry_msgs.msg 
 from geometry_msgs.msg import PoseStamped
 
@@ -297,14 +298,14 @@ def calculate_pose(laser_scan, scan_index, centre_point=None, angle_min=None, an
         return None
     
     # Convert the polar coordinates (r, angle) to Cartesian coordinates (x, y), calculated: θ=angle_min+scan_index×angle_increment
-    x = r * math.cos(angle)
-    y = r * math.sin(angle)
+    x = r * math.sin(angle)
+    z = r * math.cos(angle)
     
     rospy.loginfo("calculated x position from laser data: %f ", x)
-    rospy.loginfo("calculated y position from laser data: %f ", y)
+    rospy.loginfo("calculated y position from laser data: %f ", z)
     rospy.loginfo("calculated angle from laser data: %f ", angle)
     
-    convertLaserTransform(x, y, angle)
+    convertLaserTransform(x, z, angle)
     # # Shutdown the node after processing is complete
     # rospy.signal_shutdown("Pose calculation complete.")  # Gracefully shuts down the node
 
@@ -334,7 +335,7 @@ def getTransform():
     except TransformException as e:
         rospy.signal_shutdown("Could not get transform: %s", e)
 
-def convertLaserTransform(x, y, angle):
+def convertLaserTransform(x, z, angle):
     """
     Convert a position from laser_scanner_link to base_link.
 
@@ -358,26 +359,20 @@ def convertLaserTransform(x, y, angle):
         laser_pose.header.frame_id = 'laser_scanner_link'
         laser_pose.header.stamp = rospy.Time(0)
         laser_pose.pose.position.x = x
-        laser_pose.pose.position.y = y
-        laser_pose.pose.position.z = 0  # Assuming the laser scanner is on a 2D plane
+        laser_pose.pose.position.y = 0
+        laser_pose.pose.position.z = z  # Assuming the laser scanner is on a 2D plane
         
-        # Calculate the yaw angle representing the direction from the scanner to the point
-        yaw = math.atan2(y, x)  # Angle of vector (x, y) from scanner to point
-        quaternion = tf.transformations.quaternion_from_euler(0, 0, yaw)
-        
-        # Add a rotation to align z-axis with x-axis
-        alignment_quaternion = tf.transformations.quaternion_from_euler(0, math.pi / 2, 0)
-        final_quaternion = tf.transformations.quaternion_multiply(alignment_quaternion, quaternion)
+        # Get the robot's current orientation (from base_link)
+        robot_transform = tf_buffer.lookup_transform('base_link', 'tcp_eff', rospy.Time(0))  # Assuming 'world' is a fixed reference frame
+        robot_orientation = robot_transform.transform.rotation  # Robot's orientation in world frame
 
-        laser_pose.pose.orientation.x = final_quaternion[0]
-        laser_pose.pose.orientation.y = final_quaternion[1]
-        laser_pose.pose.orientation.z = final_quaternion[2]
-        laser_pose.pose.orientation.w = final_quaternion[3]
-        
-        # Transform the laser scanner pose to base_link frame
-        seam_pose = do_transform_pose(laser_pose, transform)
-        transformed_pose = seam_pose
-        # Extract the transformed position and angle (orientation)
+        # Apply the transformation
+        transformed_pose = do_transform_pose(laser_pose, transform)
+
+        # Use the robot's original orientation
+        transformed_pose.pose.orientation = robot_orientation
+
+        # Extract transformed values
         transformed_x = transformed_pose.pose.position.x
         transformed_y = transformed_pose.pose.position.y
         transformed_z = transformed_pose.pose.position.z
@@ -386,9 +381,9 @@ def convertLaserTransform(x, y, angle):
             transformed_pose.pose.orientation.y,
             transformed_pose.pose.orientation.z,
             transformed_pose.pose.orientation.w
-        ])[2]  # Extract the yaw angle
+        ])[2]  # Extract yaw angl
         
-        weld_seam_pose_pub.publish(seam_pose)
+        weld_seam_pose_pub.publish(transformed_pose)
         rospy.loginfo(f"Publishing weld seam pose: x={transformed_x}, y={transformed_y}, z={transformed_z}")
         return transformed_x, transformed_y, transformed_yaw
 
